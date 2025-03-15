@@ -1,34 +1,41 @@
 import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import dotenv from 'dotenv';
-import userRoutes from './routes/userRoutes';
+import swaggerUi from 'swagger-ui-express';
+import swaggerSpec from './config/swagger';
 import authRoutes from './routes/authRoutes';
-import { errorHandler } from './middleware/errorHandler';
+import userRoutes from './routes/userRoutes';
+// Diğer importlar...
 
-// Load environment variables
-dotenv.config();
-
-// Initialize express app
 const app = express();
-const port = process.env.PORT || 3000;
+
+// Swagger UI
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // Middleware
-app.use(helmet());
-app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Diğer middleware'ler...
 
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 
-// Error handling middleware
-app.use(errorHandler);
-
-// Start server
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+app.get('/swagger.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  console.log('Swagger JSON dokümantasyonu talep edildi');
+  res.send(swaggerSpec);
+});
+// Swagger JSON dokümantasyonunu sunar
+app.get('/', (req, res) => {
+  res.send(`
+    <h1>Sportlink API</h1>
+    <p>Hoş geldiniz! API dokümantasyonu entegre edilmiştir.</p>
+    <p>Dokümantasyona erişmek için: <a href="/api-docs">API Dokümantasyonu (Swagger UI)</a></p>
+    <p>JSON formatında erişmek için: <a href="/swagger.json">swagger.json</a></p>
+  `);
 });
 
-export default app; 
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`API Documentation available at http://localhost:${PORT}/api-docs`);
+});
