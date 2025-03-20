@@ -65,6 +65,10 @@ src/
 - `GET /api/users` - Tüm kullanıcıları getir (sadece admin)
 - `GET /api/users/:id` - Belirli bir kullanıcıyı getir
 
+### Profil
+- `GET /api/profile` - Kullanıcı profilini getir
+- `PUT /api/profile` - Kullanıcı profilini güncelle
+
 ## Geliştirme Standartları
 
 Bu proje, `.cursorrules` dosyasında belirtilen Sportlink Development Standards (SCDS) kurallarına uygun olarak geliştirilmiştir.

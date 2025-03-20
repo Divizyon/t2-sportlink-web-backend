@@ -1,36 +1,35 @@
-import swaggerJSDoc from 'swagger-jsdoc';
+import swaggerJsdoc from 'swagger-jsdoc';
 
-const options: swaggerJSDoc.Options = {
-  definition: {
-    openapi: '3.0.0',
-    info: {
-      title: 'Sportlink API',
-      version: '1.0.0',
-      description: 'Sportlink web uygulaması API dokümantasyonu',
-    },
-    servers: [
-      {
-        url: `http://localhost:${process.env.PORT || 3000}`,
-        description: 'Geliştirme sunucusu',
-      },
-    ],
-    components: {
-      securitySchemes: {
-        bearerAuth: {
-          type: 'http',
-          scheme: 'bearer',
-          bearerFormat: 'JWT',
+const options = {
+    definition: {
+        openapi: '3.0.0',
+        info: {
+            title: 'Sportlink API',
+            version: '1.0.0',
+            description: 'Sportlink web uygulaması için REST API dokümantasyonu',
         },
-      },
+        servers: [
+            {
+                url: `http://localhost:${process.env.PORT || 3000}`,
+                description: 'Development server',
+            },
+        ],
+        components: {
+            securitySchemes: {
+                bearerAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'JWT',
+                },
+            },
+        },
+        security: [{
+            bearerAuth: [],
+        }],
     },
-  },
-  apis: [
-    './src/routes/*.ts', 
-    './src/models/*.ts',
-    './src/controllers/*.ts'
-  ],
+    apis: ['./src/routes/*.ts'], // Swagger JSDoc'un arayacağı dosya yolları
 };
 
-const swaggerSpec = swaggerJSDoc(options);
+const swaggerSpec = swaggerJsdoc(options);
 
 export default swaggerSpec;

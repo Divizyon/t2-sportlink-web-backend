@@ -1,47 +1,28 @@
 import { Request, Response, NextFunction } from 'express';
-import supabase from '../config/supabase';
+import { supabase } from '../config/supabase';
 
 export const protect = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    // 1) Get token from the Authorization header
-    let token;
-    if (
-      req.headers.authorization &&
-      req.headers.authorization.startsWith('Bearer')
-    ) {
-      token = req.headers.authorization.split(' ')[1];
+    try {
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader?.startsWith('Bearer ')) {
+            return res.status(401).json({ error: 'Yetkilendirme başarısız. Token bulunamadı.' });
+        }
+
+        const token = authHeader.split(' ')[1];
+        
+        const { data: { user }, error } = await supabase.auth.getUser(token);
+
+        if (error || !user) {
+            return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token.' });
+        }
+
+        // @ts-ignore
+        req.user = user;
+        next();
+    } catch (error: any) {
+        res.status(401).json({ error: 'Yetkilendirme başarısız.' });
     }
-
-    if (!token) {
-      return res.status(401).json({
-        status: 'error',
-        message: 'Bu işlemi gerçekleştirmek için giriş yapmalısınız.'
-      });
-    }
-
-    // 2) Verify token
-    const { data, error } = await supabase.auth.getUser(token);
-
-    if (error || !data.user) {
-      return res.status(401).json({
-        status: 'error',
-        message: 'Geçersiz token. Lütfen tekrar giriş yapın.'
-      });
-    }
-
-    // 3) Check if user still exists
-    // This is handled by Supabase automatically
-
-    // 4) Grant access to protected route
-    req.user = data.user;
-    next();
-  } catch (error) {
-    console.error('Auth middleware error:', error);
-    return res.status(401).json({
-      status: 'error',
-      message: 'Kimlik doğrulama başarısız oldu.'
-    });
-  }
 };
 
 // Middleware to restrict access to certain roles
