@@ -1,16 +1,21 @@
 import { supabase, supabaseAdmin } from '../config/supabase';
 import { RegisterDTO, LoginDTO, AuthResponse, ResetPasswordDTO } from '../types/auth.types';
+import { DatabaseService } from './DatabaseService';
 
 export class AuthService {
+    private databaseService: DatabaseService;
+
+    constructor() {
+        this.databaseService = new DatabaseService();
+    }
+
     async register(data: RegisterDTO): Promise<AuthResponse> {
         try {
             console.log('Starting registration process for:', data.email);
-
-            // Önce kullanıcının var olup olmadığını kontrol et
-            const { data: existingUser, error: getUserError } = await supabase.auth.getUser();
             
+            // Önce kullanıcı var mı kontrol et
+            const { data: existingUser } = await supabase.auth.getUser();
             if (existingUser?.user) {
-                console.log('User already exists:', existingUser.user.email);
                 return {
                     user: null,
                     session: null,
@@ -18,16 +23,14 @@ export class AuthService {
                 };
             }
 
-            console.log('No existing user found, proceeding with registration');
-
+            // Kullanıcı kaydı
             const { data: authData, error } = await supabase.auth.signUp({
                 email: data.email,
                 password: data.password,
                 options: {
                     data: {
                         name: data.name
-                    },
-                    emailRedirectTo: `${process.env.APP_URL || 'http://localhost:3000'}/auth/callback`
+                    }
                 }
             });
 
@@ -38,26 +41,36 @@ export class AuthService {
             });
 
             if (error) {
-                console.error('Registration error:', {
-                    message: error.message,
-                    status: error.status,
-                    name: error.name
-                });
+                console.error('Registration error:', error);
                 throw error;
             }
 
-            // Başarılı kayıt
-            if (authData?.user) {
-                console.log('Successfully registered user:', authData.user.email);
-                return {
-                    user: authData.user,
-                    session: authData.session
-                };
+            if (!authData?.user) {
+                throw new Error('No user data returned');
             }
 
-            throw new Error('Registration failed - no user data returned');
+            // Profil oluştur
+            console.log('Creating profile for user:', authData.user.id);
+            const { data: profile, error: profileError } = await this.databaseService.createProfile(
+                authData.user.id,
+                {
+                    full_name: data.name
+                }
+            );
+
+            if (profileError) {
+                console.error('Profile creation error:', profileError);
+                // Profil oluşturma hatası olsa bile kullanıcı kaydını tamamla
+            } else {
+                console.log('Profile created successfully:', profile);
+            }
+
+            return {
+                user: authData.user,
+                session: authData.session
+            };
         } catch (error: any) {
-            console.error('Registration catch block error:', error);
+            console.error('Registration process error:', error);
             return {
                 user: null,
                 session: null,
