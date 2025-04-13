@@ -9,6 +9,9 @@ import profileRoutes from './routes/profileRoutes';
 // Load environment variables
 dotenv.config();
 
+
+
+
 const app = express();
 
 // Middleware
