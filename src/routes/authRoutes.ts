@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { AuthController } from '../controllers/AuthController';
 import { protect } from '../middleware/authMiddleware';
 import { Request, Response } from 'express';
-import { AuthService } from '../services/AuthService';
+import { AuthService } from '../services/authService';
 
 const router = Router();
 const authController = new AuthController();
@@ -86,6 +86,12 @@ router.post('/login', authController.login);
  *       401:
  *         description: Yetkilendirme hatası
  */
+
+router.get('/test', (req: Request, res: Response) => {
+    console.log('Test route received');
+    res.json({ message: 'Test route' });
+});
+
 router.post('/logout', protect, authController.logout);
 
 /**

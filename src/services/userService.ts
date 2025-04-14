@@ -1,19 +1,36 @@
-import supabase from '../config/supabase';
+import { supabase } from '../config/supabase';
 import { User, CreateUserDTO } from '../models/User';
 
-export const findUserById = async (id: string): Promise<User | null> => {
+export const getUserById = async (userId: string) => {
   try {
     const { data, error } = await supabase
       .from('users')
       .select('*')
-      .eq('id', id)
+      .eq('id', userId)
       .single();
 
     if (error) throw error;
-    return data as User;
+    return data;
   } catch (error) {
-    console.error('Error finding user by ID:', error);
-    return null;
+    console.error('Error in getUserById:', error);
+    throw error;
+  }
+};
+
+export const updateUser = async (userId: string, updates: any) => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .update(updates)
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error in updateUser:', error);
+    throw error;
   }
 };
 

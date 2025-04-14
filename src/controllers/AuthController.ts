@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { AuthService } from '../services/AuthService';
+import { AuthService } from '../services/authService';
 import { RegisterDTO, LoginDTO, ResetPasswordDTO } from '../types/auth.types';
 
 export class AuthController {
@@ -57,7 +57,9 @@ export class AuthController {
 
     public login = async (req: Request, res: Response): Promise<Response> => {
         try {
+            console.log('Login request received:', req.body);
             const { email, password } = req.body;
+            console.log('Login request received:', email, password);
             const result = await this.authService.login(email, password);
 
             if (result.error) {

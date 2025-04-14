@@ -5,12 +5,10 @@ import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger';
 import authRoutes from './routes/authRoutes';
 import profileRoutes from './routes/profileRoutes';
+import adminRoutes from './routes/adminRoutes';
 
 // Load environment variables
 dotenv.config();
-
-
-
 
 const app = express();
 
@@ -24,6 +22,7 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Swagger JSON endpoint
 app.get('/swagger.json', (req, res) => {
@@ -34,7 +33,7 @@ app.get('/swagger.json', (req, res) => {
 // Ana sayfa
 app.get('/', (req, res) => {
     res.send(`
-        <h1>Sportlink API</h1>
+        <h1>Sportlink deneme API</h1>
         <p>API dokümantasyonuna erişmek için: <a href="/api-docs">Swagger UI</a></p>
         <p>JSON formatında erişmek için: <a href="/swagger.json">swagger.json</a></p>
     `);
