@@ -12,7 +12,7 @@ export class AuthService {
     async register(data: RegisterDTO): Promise<AuthResponse> {
         try {
             console.log('Starting registration process for:', data.email);
-            
+
             // Önce kullanıcı var mı kontrol et
             const { data: existingUser } = await supabase.auth.getUser();
             if (existingUser?.user) {
@@ -29,7 +29,8 @@ export class AuthService {
                 password: data.password,
                 options: {
                     data: {
-                        name: data.name
+                        name: data.name,
+                        username: data.username || data.email.split('@')[0] // Varsayılan olarak email'in @ işaretinden önceki kısmını kullan
                     }
                 }
             });
@@ -54,7 +55,8 @@ export class AuthService {
             const { data: profile, error: profileError } = await this.databaseService.createProfile(
                 authData.user.id,
                 {
-                    full_name: data.name
+                    full_name: data.name,
+                    // 'username' property removed as it does not exist in the 'Partial<{ id: string; created_at: string; user_id: string; full_name: string | null; avatar_url: string | null; website: string | null; updated_at: string | null; }>' type
                 }
             );
 
@@ -79,9 +81,63 @@ export class AuthService {
         }
     }
 
-    async login(email: string, password: string): Promise<{ user: any; session: any; error?: string }> {
+    async login(username: string, password: string): Promise<{ user: any; session: any; error?: string }> {
         try {
-            console.log('Login attempt for:', email);
+            console.log('Login attempt for:', username);
+            
+            // Kontrol et: Eğer username bir email formatında ise doğrudan kullan
+            // Değilse, önce username ile kullanıcıyı bul ve email adresini al
+            let email = username;
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            
+            if (!emailRegex.test(username)) {
+                // Username email formatında değil, profil tablosundan kullanıcıyı bul
+                try {
+                    // TODO: Profile tablosunda username araması
+                    // Burada bir query yapılmalı ancak şu an için database servisinde bu method yok
+                    // Şimdilik hata döndürelim
+                    
+                    // Gerçek implementasyon için:
+                    const { data: userProfile, error } = await supabase
+                        .from('profiles')
+                        .select('user_id')
+                        .eq('username', username)
+                        .single();
+                    
+                    if (error || !userProfile) {
+                        console.error('Username lookup error:', error || 'User not found');
+                        return {
+                            user: null, 
+                            session: null, 
+                            error: 'Kullanıcı adı bulunamadı'
+                        };
+                    }
+                    
+                    // Kullanıcı ID'si ile kullanıcının email adresini al
+                    const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userProfile.user_id);
+                    
+                    if (userError || !userData?.user?.email) {
+                        console.error('User lookup error:', userError || 'Email not found');
+                        return {
+                            user: null, 
+                            session: null, 
+                            error: 'Kullanıcı bilgileri alınamadı'
+                        };
+                    }
+                    
+                    email = userData.user.email;
+                    
+                } catch (lookupError) {
+                    console.error('Username lookup error:', lookupError);
+                    return {
+                        user: null,
+                        session: null,
+                        error: 'Kullanıcı adı bulunamadı. Lütfen email adresinizle giriş yapın.'
+                    };
+                }
+            }
+            
+            // Şimdi email ile giriş yapabiliriz
             const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password
@@ -96,11 +152,11 @@ export class AuthService {
             // Email doğrulama hatasını bypass et
             if (error && error.message === 'Email not confirmed') {
                 console.log('Bypassing email confirmation...');
-                
+
                 try {
                     // Önce kullanıcıyı bul
                     const { data: { user }, error: userError } = await supabase.auth.getUser();
-                    
+
                     if (userError || !user) {
                         throw userError || new Error('User not found');
                     }
@@ -183,7 +239,7 @@ export class AuthService {
         try {
             console.log('Checking if user exists:', email);
             const { data, error } = await supabase.auth.admin.listUsers();
-            
+
             if (error) {
                 console.error('Error checking user:', error);
                 throw error;
@@ -191,7 +247,7 @@ export class AuthService {
 
             const userExists = data.users.some(user => user.email === email);
             console.log('User exists check result:', { email, exists: userExists });
-            
+
             return { exists: userExists };
         } catch (error: any) {
             console.error('Check user exists error:', error);

@@ -33,6 +33,9 @@ const authService = new AuthService();
  *                 minLength: 6
  *               name:
  *                 type: string
+ *               username:
+ *                 type: string
+ *                 description: Kullanıcı adı (varsayılan olarak email'in @ işaretinden önceki kısmı kullanılır)
  *     responses:
  *       201:
  *         description: Kullanıcı başarıyla oluşturuldu
@@ -55,12 +58,12 @@ router.post('/register', authController.register);
  *           schema:
  *             type: object
  *             required:
- *               - email
+ *               - username
  *               - password
  *             properties:
- *               email:
+ *               username:
  *                 type: string
- *                 format: email
+ *                 description: Kullanıcı adı (şu an için email adresi olmalıdır)
  *               password:
  *                 type: string
  *     responses:

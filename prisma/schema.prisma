@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+  binaryTargets = ["native", "darwin-arm64"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Admin {
+  id            String         @id @default(uuid())
+  email         String?        @unique
+  passwordHash  String
+  role          String         @default("editor")
+  isActive      Boolean        @default(true)
+  lastLogin     DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  username      String         @unique
+  profile       AdminProfile?
+  announcements Announcement[]
+  news          News[]
+}
+
+model AdminProfile {
+  id          String   @id @default(uuid())
+  adminId     String   @unique
+  firstName   String
+  lastName    String
+  avatarUrl   String?
+  phoneNumber String?
+  bio         String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  admin       Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+}
+
+model News {
+  id          String         @id @default(uuid())
+  title       String
+  slug        String         @unique
+  content     String
+  summary     String?
+  imageUrl    String?
+  isPublished Boolean        @default(false)
+  authorId    String
+  publishedAt DateTime?
+  viewCount   Int            @default(0)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  author      Admin          @relation(fields: [authorId], references: [id])
+  categories  NewsCategory[] @relation("NewsToNewsCategory")
+}
+
+model NewsCategory {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  news        News[]   @relation("NewsToNewsCategory")
+}
+
+model Announcement {
+  id          String    @id @default(uuid())
+  title       String
+  content     String
+  isImportant Boolean   @default(false)
+  isPublished Boolean   @default(false)
+  authorId    String
+  publishedAt DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  author      Admin     @relation(fields: [authorId], references: [id])
+}

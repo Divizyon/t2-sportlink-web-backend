@@ -5,17 +5,21 @@ import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger';
 import authRoutes from './routes/authRoutes';
 import profileRoutes from './routes/profileRoutes';
+import adminRoutes from './routes/adminRoutes';
+import newsRoutes from './routes/newsRoutes';
+import announcementRoutes from './routes/announcementRoutes';
 
 // Load environment variables
 dotenv.config();
 
-
-
-
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: ['http://localhost:3001', 'http://localhost:8000', 'http://127.0.0.1:8000'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    credentials: true
+}));
 app.use(express.json());
 
 // Swagger UI
@@ -24,6 +28,9 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/news', newsRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 // Swagger JSON endpoint
 app.get('/swagger.json', (req, res) => {
@@ -47,7 +54,9 @@ app.get('/health', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
     console.log(`Server is running on port ${PORT}`);
     console.log(`API Documentation available at http://localhost:${PORT}/api-docs`);
+
+    // Initialize superadmin account if none exists
 });
