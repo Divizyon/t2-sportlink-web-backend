@@ -11,21 +11,18 @@ export interface RegisterDTO {
     default_location_latitude: number;
     default_location_longitude: number;
     role?: 'admin' | 'user' | 'coach';
-    name?: string;
 }
 
 export interface LoginDTO {
-    email?: string;
+    email: string;
     password: string;
-    username?: string;
 }
 
 export interface AuthResponse {
-    user: Partial<User>;
+    user: Partial<any>;
     token: string;
     message: string;
     error?: string;
-    session?: any;
 }
 
 export interface ResetPasswordDTO {

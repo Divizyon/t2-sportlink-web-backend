@@ -4,6 +4,7 @@ import { DatabaseService } from './DatabaseService';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { User } from '../models/User';
+import jwt from 'jsonwebtoken';
 
 export class AuthService {
     private databaseService: DatabaseService;
@@ -41,15 +42,21 @@ export class AuthService {
                 };
             }
 
-            // Kullanıcı kaydı
+            // Şifreyi hash'le
+            const saltRounds = 10;
+            const hashedPassword = await bcrypt.hash(data.password, saltRounds);
+
+            // Supabase ile kullanıcı kaydı (email doğrulama gerekli)
             const { data: authData, error } = await supabase.auth.signUp({
                 email: data.email,
                 password: data.password,
                 options: {
                     data: {
                         first_name: data.first_name,
+                        last_name: data.last_name,
                         username: data.username || data.email.split('@')[0]
-                    }
+                    },
+                    emailRedirectTo: `${process.env.FRONTEND_URL}/email-confirmed`
                 }
             });
 
@@ -68,10 +75,6 @@ export class AuthService {
                 throw new Error('No user data returned');
             }
 
-            // Şifreyi hash'le
-            const saltRounds = 10;
-            const hashedPassword = await bcrypt.hash(data.password, saltRounds);
-
             // Users tablosuna kayıt
             try {
                 const newUser = await this.prisma.users.create({
@@ -80,47 +83,36 @@ export class AuthService {
                         email: data.email,
                         password: hashedPassword, // Hash'lenmiş şifreyi kaydet
                         first_name: data.first_name || '',
-                        last_name: '',
-                        phone: '',
-                        profile_picture: '',
-                        default_location_latitude: 0,
-                        default_location_longitude: 0,
-                        role: 'user'
+                        last_name: data.last_name || '',
+                        phone: data.phone || '',
+                        profile_picture: data.profile_picture || '',
+                        default_location_latitude: data.default_location_latitude || 0,
+                        default_location_longitude: data.default_location_longitude || 0,
+                        role: data.role || 'user'
                     }
                 });
                 console.log('User created in database:', newUser);
+                
+                return {
+                    user: {
+                        id: newUser.id,
+                        email: newUser.email,
+                        username: newUser.username,
+                        first_name: newUser.first_name,
+                        last_name: newUser.last_name,
+                        role: newUser.role
+                    } as Partial<User>,
+                    token: '', // Email onaylanana kadar token vermiyoruz
+                    message: 'Kullanıcı kaydı başarılı. Email adresinize gönderilen link ile hesabınızı onaylamanız gerekmektedir.'
+                };
+                
             } catch (dbError) {
                 console.error('Database error:', dbError);
                 // Veritabanı hatası durumunda Supabase kaydını da sil
-                await supabase.auth.admin.deleteUser(authData.user.id);
+                await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
                 throw new Error('Veritabanı kaydı oluşturulamadı');
             }
 
-            // Profil oluştur
-            console.log('Creating profile for user:', authData.user.id);
-            const { data: profile, error: profileError } = await this.databaseService.createProfile(
-                authData.user.id,
-                {
-                    full_name: data.first_name + ' ' + data.last_name,
-                }
-            );
-
-            if (profileError) {
-                console.error('Profile creation error:', profileError);
-            } else {
-                console.log('Profile created successfully:', profile);
-            }
-
-            return {
-                user: {
-                    id: authData.user?.id ? BigInt(authData.user.id) : undefined,
-                    email: authData.user?.email,
-                    username: authData.user?.user_metadata?.username,
-                    role: authData.user?.user_metadata?.role
-                } as Partial<User>,
-                token: authData.session?.access_token || '',
-                message: 'Kullanıcı kaydı başarılı'
-            };
         } catch (error: any) {
             console.error('Registration process error:', error);
             return {
@@ -132,215 +124,110 @@ export class AuthService {
         }
     }
 
-    async login(username: string, password: string): Promise<AuthResponse> {
+    async login(credentials: LoginDTO): Promise<AuthResponse> {
         try {
-            console.log('Login attempt for:', username);
+            console.log('Login attempt for:', credentials.email);
             
-            // Kontrol et: Eğer username bir email formatında ise doğrudan kullan
-            // Değilse, önce username ile kullanıcıyı bul ve email adresini al
-            let email = username;
-            let dbUser = null;
+            // Kullanıcı email ile veya username ile giriş yapabilir
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const isEmail = emailRegex.test(credentials.email);
             
             // Kullanıcıyı veritabanında bul (email veya username ile)
-            try {
-                if (emailRegex.test(username)) {
-                    // Email ile kullanıcıyı bul
-                    dbUser = await this.prisma.users.findFirst({
-                        where: { email: username }
-                    });
-                } else {
-                    // Username ile kullanıcıyı bul
-                    dbUser = await this.prisma.users.findFirst({
-                        where: { username: username }
-                    });
-                }
-                
-                if (!dbUser) {
-                    return {
-                        user: {},
-                        token: '',
-                        message: 'Kullanıcı bulunamadı',
-                        error: 'Kullanıcı bulunamadı'
-                    };
-                }
-                
-                // Kullanıcı rolünü kontrol et - Sadece admin veya superadmin giriş yapabilir
-                if (dbUser.role !== 'admin' && dbUser.role !== 'superadmin') {
-                    return {
-                        user: {},
-                        token: '',
-                        message: 'Bu hesaba erişim yetkiniz bulunmamaktadır',
-                        error: 'Bu hesaba erişim yetkiniz bulunmamaktadır. Sadece yöneticiler giriş yapabilir.'
-                    };
-                }
-                
-                email = dbUser.email;
-                
-                // Veritabanındaki şifreyi kontrol et (eğer şifre varsa)
-                if (dbUser.password && dbUser.password !== '') {
-                    const passwordMatch = await bcrypt.compare(password, dbUser.password);
-                    if (!passwordMatch) {
-                        return {
-                            user: {},
-                            token: '',
-                            message: 'Hatalı şifre',
-                            error: 'Hatalı şifre'
-                        };
-                    }
-                }
-            } catch (dbError) {
-                console.error('Database user lookup error:', dbError);
-                // Veritabanı hatası durumunda sadece Supabase doğrulamasına devam et
+            const user = await this.prisma.users.findFirst({
+                where: isEmail 
+                    ? { email: credentials.email } 
+                    : { username: credentials.email }
+            });
+            
+            if (!user) {
+                return {
+                    user: {} as Partial<User>,
+                    token: '',
+                    message: 'Kullanıcı bulunamadı',
+                    error: 'Kullanıcı bulunamadı'
+                };
             }
             
-            // Supabase ile giriş yap
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email,
-                password
-            });
-
-            console.log('Login response:', {
-                success: !!data,
-                error: error?.message,
-                userId: data?.user?.id
-            });
-
-            // Email doğrulama hatasını bypass et
-            if (error && error.message === 'Email not confirmed') {
-                console.log('Bypassing email confirmation...');
-                
-                try {
-                    // Önce kullanıcıyı bul
-                    const { data: { user }, error: userError } = await supabase.auth.getUser();
-                    
-                    if (userError || !user) {
-                        throw userError || new Error('User not found');
-                    }
-
-                    // Email'i doğrudan doğrula
-                    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-                        user.id,
-                        { email_confirm: true }
-                    );
-
-                    if (updateError) {
-                        throw updateError;
-                    }
-
-                    // Tekrar giriş dene
-                    const { data: newAuthData, error: newAuthError } = await supabase.auth.signInWithPassword({
-                        email,
-                        password
-                    });
-
-                    if (newAuthError) {
-                        throw newAuthError;
-                    }
-
-                    return {
-                        user: {
-                            id: newAuthData.user?.id ? BigInt(newAuthData.user.id) : undefined,
-                            email: newAuthData.user?.email,
-                            username: newAuthData.user?.user_metadata?.username,
-                            role: newAuthData.user?.user_metadata?.role
-                        } as Partial<User>,
-                        token: newAuthData.session?.access_token || '',
-                        message: 'Giriş başarılı'
-                    };
-                } catch (adminError: any) {
-                    console.error('Admin operation error:', adminError);
-                    throw adminError;
-                }
+            // Şifreyi kontrol et
+            const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
+            if (!isPasswordValid) {
+                return {
+                    user: {} as Partial<User>,
+                    token: '',
+                    message: 'Hatalı şifre',
+                    error: 'Hatalı şifre'
+                };
             }
-
+            
+            // Supabase'de email doğrulama durumunu kontrol et
+            const { data: authData, error } = await supabase.auth.signInWithPassword({
+                email: user.email,
+                password: credentials.password
+            });
+            
             if (error) {
-                console.error('Login error:', error);
-                if (error.message === 'Email not confirmed') {
+                // Email doğrulama hatası kontrolü
+                if (error.message.includes('Email not confirmed') || error.message.includes('Email not verified')) {
                     return {
-                        user: {},
+                        user: {} as Partial<User>,
                         token: '',
                         message: 'Email adresinizi doğrulamanız gerekmektedir',
                         error: 'Email adresinizi doğrulamanız gerekmektedir. Lütfen email kutunuzu kontrol edin.'
                     };
                 }
                 
-                // Eğer Supabase Auth hatası varsa ama veritabanı doğrulaması başarılıysa
-                // ve veritabanında geçerli bir şifre varsa, manuel oturum açabiliriz
-                if (dbUser && dbUser.password && dbUser.password !== '') {
-                    // Role kontrolü tekrar - Sadece admin veya superadmin
-                    if (dbUser.role !== 'admin' && dbUser.role !== 'superadmin') {
-                        return {
-                            user: {},
-                            token: '',
-                            message: 'Bu hesaba erişim yetkiniz bulunmamaktadır',
-                            error: 'Bu hesaba erişim yetkiniz bulunmamaktadır. Sadece yöneticiler giriş yapabilir.'
-                        };
-                    }
-                    
-                    // Bu durumda sadece veritabanı doğrulamasına dayanarak bir oturum döndür
-                    // NOT: Bu basitleştirilmiş bir yaklaşımdır, ideal olarak JWT token oluşturmanız gerekebilir
-                    return {
-                        user: {
-                            id: dbUser.id,
-                            email: dbUser.email,
-                            username: dbUser.username,
-                            role: dbUser.role
-                        } as unknown as Partial<User>,
-                        token: 'MANUAL_AUTH_TOKEN_' + Date.now(),
-                        message: 'Manuel giriş başarılı'
-                    };
-                }
-                
-                throw error;
-            }
-
-            if (!data?.user) {
-                throw new Error('No user data returned');
-            }
-            
-            // Supabase Auth başarılı olsa bile, role kontrolü yapmak için kullanıcıyı DB'den kontrol et
-            if (dbUser && dbUser.role !== 'admin' && dbUser.role !== 'superadmin') {
-                // Supabase oturumunu sonlandır
-                await supabase.auth.signOut();
-                
+                console.error('Login error:', error);
                 return {
-                    user: {},
+                    user: {} as Partial<User>,
                     token: '',
-                    message: 'Bu hesaba erişim yetkiniz bulunmamaktadır',
-                    error: 'Bu hesaba erişim yetkiniz bulunmamaktadır. Sadece yöneticiler giriş yapabilir.'
+                    message: 'Giriş başarısız',
+                    error: error.message
                 };
             }
-
+            
+            // JWT token oluştur
+            const token = jwt.sign(
+                { 
+                    userId: user.id.toString(), 
+                    email: user.email, 
+                    role: user.role 
+                },
+                process.env.JWT_SECRET || 'default_secret',
+                { expiresIn: '7d' }
+            );
+            
             return {
                 user: {
-                    id: data.user?.id ? BigInt(data.user.id) : undefined,
-                    email: data.user?.email,
-                    username: data.user?.user_metadata?.username,
-                    role: data.user?.user_metadata?.role
+                    id: user.id,
+                    email: user.email,
+                    username: user.username,
+                    first_name: user.first_name,
+                    last_name: user.last_name,
+                    phone: user.phone,
+                    profile_picture: user.profile_picture,
+                    role: user.role
                 } as Partial<User>,
-                token: data.session?.access_token || '',
+                token,
                 message: 'Giriş başarılı'
             };
         } catch (error: any) {
-            console.error('Login process error:', error);
-            return { 
-                user: {} as Partial<User>, 
-                token: '', 
+            console.error('Login error:', error);
+            return {
+                user: {} as Partial<User>,
+                token: '',
                 message: 'Giriş başarısız',
-                error: error.message 
+                error: error.message
             };
         }
     }
 
-    async logout(): Promise<void> {
-        const { error } = await supabase.auth.signOut();
-        if (error) throw error;
-    }
-
+    // Şifre sıfırlama e-postası gönderme
     async resetPassword(data: ResetPasswordDTO): Promise<{ error?: string }> {
         try {
-            const { error } = await supabase.auth.resetPasswordForEmail(data.email);
+            const { error } = await supabase.auth.resetPasswordForEmail(data.email, {
+                redirectTo: `${process.env.FRONTEND_URL}/reset-password`
+            });
+            
             if (error) throw error;
             return {};
         } catch (error: any) {
@@ -348,11 +235,35 @@ export class AuthService {
         }
     }
 
+    // Diğer metodlar aynen kalabilir...
+    async logout(): Promise<void> {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+    }
+
     async getCurrentUser() {
         try {
             const { data: { user }, error } = await supabase.auth.getUser();
             if (error) throw error;
             return { user };
+        } catch (error: any) {
+            return { error: error.message };
+        }
+    }
+
+    // Email onaylama durumunu yeniden gönderme
+    async resendEmailConfirmation(email: string): Promise<{ error?: string }> {
+        try {
+            const { error } = await supabase.auth.resend({
+                type: 'signup',
+                email: email,
+                options: {
+                    emailRedirectTo: `${process.env.FRONTEND_URL}/email-confirmed`
+                }
+            });
+            
+            if (error) throw error;
+            return { };
         } catch (error: any) {
             return { error: error.message };
         }
