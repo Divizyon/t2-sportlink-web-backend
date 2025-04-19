@@ -46,6 +46,47 @@ router.post('/register', authController.register);
 
 /**
  * @swagger
+ * /api/auth/register-admin:
+ *   post:
+ *     tags:
+ *       - Authentication
+ *     summary: Yeni admin veya süper admin kullanıcı kaydı
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 minLength: 6
+ *               name:
+ *                 type: string
+ *               username:
+ *                 type: string
+ *                 description: Kullanıcı adı (varsayılan olarak email'in @ işaretinden önceki kısmı kullanılır)
+ *               role:
+ *                 type: string
+ *                 enum: [admin, superadmin]
+ *                 default: admin
+ *                 description: Kullanıcı rolü - admin veya superadmin
+ *     responses:
+ *       201:
+ *         description: Admin kullanıcı başarıyla oluşturuldu
+ *       400:
+ *         description: Geçersiz input
+ */
+router.post('/register-admin', authController.registerAdmin);
+
+/**
+ * @swagger
  * /api/auth/login:
  *   post:
  *     tags:
