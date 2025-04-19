@@ -10,7 +10,7 @@ export class DatabaseService {
     async createProfile(userId: string, data: Partial<ProfilesTable>): Promise<{ data: ProfilesTable | null; error: any }> {
         try {
             const { data: profile, error } = await supabase
-                .from('profiles')
+                .from('users')
                 .insert([
                     {
                         user_id: userId,
@@ -33,7 +33,7 @@ export class DatabaseService {
     async getProfile(userId: string): Promise<{ data: ProfilesTable | null; error: any }> {
         try {
             const { data: profile, error } = await supabase
-                .from('profiles')
+                .from('users')
                 .select('*')
                 .eq('user_id', userId)
                 .single();
@@ -51,7 +51,7 @@ export class DatabaseService {
     async updateProfile(userId: string, data: Partial<ProfilesTable>): Promise<{ data: ProfilesTable | null; error: any }> {
         try {
             const { data: profile, error } = await supabase
-                .from('profiles')
+                .from('users')
                 .update(data)
                 .eq('user_id', userId)
                 .select()
