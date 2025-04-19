@@ -1,15 +1,26 @@
 import { Request, Response } from 'express';
-import * as userService from '../services/userService';
+import { UserService } from '../services/userService';
+
+const userService = new UserService();
 
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
-    const users = await userService.getAllUsers();
-    
+    const page = parseInt(req.query.page as string) || 1;
+    const pageSize = parseInt(req.query.pageSize as string) || 10;
+
+    const { users, total } = await userService.listUsers(page, pageSize);
+
     res.status(200).json({
       status: 'success',
       results: users.length,
       data: {
         users
+      },
+      pagination: {
+        page,
+        pageSize,
+        total,
+        pages: Math.ceil(total / pageSize)
       }
     });
   } catch (error) {
@@ -25,14 +36,14 @@ export const getUserById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const user = await userService.findUserById(id);
-    
+
     if (!user) {
       return res.status(404).json({
         status: 'error',
         message: 'Kullanıcı bulunamadı.'
       });
     }
-    
+
     res.status(200).json({
       status: 'success',
       data: {

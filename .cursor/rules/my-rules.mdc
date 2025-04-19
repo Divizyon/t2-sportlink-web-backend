@@ -1,0 +1,7 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+Ben database yapısını değiştir demeden değiştirme database yapısını koru

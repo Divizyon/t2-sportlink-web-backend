@@ -1,6 +1,6 @@
 import express from 'express';
 import * as UserController from '../controllers/UserController';
-import { protect, restrictTo } from '../middleware/authMiddleware';
+import { protect, restrictTo, adminOnly } from '../middleware/authMiddleware';
 
 const router = express.Router();
 
@@ -8,7 +8,7 @@ const router = express.Router();
 router.use(protect);
 
 // Routes accessible only to admins
-router.get('/', restrictTo('admin'), UserController.getAllUsers);
+router.get('/', adminOnly, UserController.getAllUsers);
 
 // Routes accessible to the user and admins
 router.get('/:id', UserController.getUserById);
