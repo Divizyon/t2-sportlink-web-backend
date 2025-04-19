@@ -1,83 +1,136 @@
-import supabase from '../config/supabase';
-import { User, CreateUserDTO } from '../models/User';
+import prisma from '../config/prisma';
+import { Users } from '@prisma/client';
 
-export const findUserById = async (id: string): Promise<User | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', id)
-      .single();
+export interface CreateUserData {
+  email: string;
+  username: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
+  profile_picture?: string;
+  default_location_latitude?: number;
+  default_location_longitude?: number;
+  role?: string;
+}
 
-    if (error) throw error;
-    return data as User;
-  } catch (error) {
-    console.error('Error finding user by ID:', error);
-    return null;
-  }
-};
+export interface UpdateUserData {
+  email?: string;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  profile_picture?: string;
+  default_location_latitude?: number;
+  default_location_longitude?: number;
+  role?: string;
+}
 
-export const findUserByEmail = async (email: string): Promise<User | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single();
-
-    if (error) throw error;
-    return data as User;
-  } catch (error) {
-    console.error('Error finding user by email:', error);
-    return null;
-  }
-};
-
-export const createUser = async (userData: CreateUserDTO): Promise<User | null> => {
-  try {
-    // First, create the auth user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: userData.email,
-      password: userData.password,
-    });
-
-    if (authError) throw authError;
-    
-    if (!authData.user) {
-      throw new Error('Auth user creation failed');
+export class UserService {
+  /**
+   * Create a new user
+   */
+  async createUser(data: CreateUserData): Promise<Users> {
+    try {
+      return await prisma.users.create({
+        data: {
+          email: data.email,
+          username: data.username,
+          password: data.password,
+          first_name: data.first_name,
+          last_name: data.last_name,
+          phone: data.phone,
+          profile_picture: data.profile_picture || '',
+          default_location_latitude: data.default_location_latitude || 0,
+          default_location_longitude: data.default_location_longitude || 0,
+          role: data.role || 'user'
+        }
+      });
+    } catch (error) {
+      console.error('Error creating user:', error);
+      throw error;
     }
-
-    // Then create the user profile in our users table
-    const { data, error } = await supabase
-      .from('users')
-      .insert({
-        id: authData.user.id,
-        email: userData.email,
-        first_name: userData.first_name,
-        last_name: userData.last_name,
-        role: userData.role || 'user',
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data as User;
-  } catch (error) {
-    console.error('Error creating user:', error);
-    return null;
   }
-};
 
-export const getAllUsers = async (): Promise<User[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*');
-
-    if (error) throw error;
-    return data as User[];
-  } catch (error) {
-    console.error('Error getting all users:', error);
-    return [];
+  /**
+   * Find a user by ID
+   */
+  async findUserById(id: string): Promise<Users | null> {
+    try {
+      return await prisma.users.findUnique({
+        where: { id: BigInt(id) }
+      });
+    } catch (error) {
+      console.error('Error finding user by ID:', error);
+      throw error;
+    }
   }
-}; 
+
+  /**
+   * Find a user by email
+   */
+  async findUserByEmail(email: string): Promise<Users | null> {
+    try {
+      return await prisma.users.findFirst({
+        where: { email }
+      });
+    } catch (error) {
+      console.error('Error finding user by email:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update a user
+   */
+  async updateUser(id: string, data: UpdateUserData): Promise<Users> {
+    try {
+      return await prisma.users.update({
+        where: { id: BigInt(id) },
+        data
+      });
+    } catch (error) {
+      console.error('Error updating user:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete a user
+   */
+  async deleteUser(id: string): Promise<Users> {
+    try {
+      return await prisma.users.delete({
+        where: { id: BigInt(id) }
+      });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * List all users with pagination
+   */
+  async listUsers(page = 1, pageSize = 10): Promise<{ users: Users[]; total: number }> {
+    try {
+      const skip = (page - 1) * pageSize;
+
+      const [users, total] = await Promise.all([
+        prisma.users.findMany({
+          skip,
+          take: pageSize,
+          orderBy: {
+            created_at: 'desc'
+          }
+        }),
+        prisma.users.count()
+      ]);
+
+      return { users, total };
+    } catch (error) {
+      console.error('Error listing users:', error);
+      throw error;
+    }
+  }
+} 

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { AuthService } from '../services/AuthService';
 import { RegisterDTO, LoginDTO, ResetPasswordDTO } from '../types/auth.types';
+import { supabase } from '../config/supabase';
 
 export class AuthController {
     private authService: AuthService;
@@ -12,13 +13,13 @@ export class AuthController {
     public register = async (req: Request, res: Response): Promise<Response> => {
         try {
             console.log('Register request received:', req.body);
-            
+
             const registerData: RegisterDTO = req.body;
-            
+
             // Email formatı kontrolü
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             if (!emailRegex.test(registerData.email)) {
-                return res.status(400).json({ 
+                return res.status(400).json({
                     error: 'Geçersiz email formatı',
                     details: 'Lütfen geçerli bir email adresi giriniz'
                 });
@@ -26,20 +27,20 @@ export class AuthController {
 
             // Şifre kontrolü
             if (!registerData.password || registerData.password.length < 6) {
-                return res.status(400).json({ 
+                return res.status(400).json({
                     error: 'Geçersiz şifre',
                     details: 'Şifre en az 6 karakter olmalıdır'
                 });
             }
 
             console.log('Validations passed, attempting registration...');
-            
+
             const result = await this.authService.register(registerData);
-            
+
             console.log('Registration result:', result);
-            
+
             if (result.error) {
-                return res.status(400).json({ 
+                return res.status(400).json({
                     error: result.error,
                     details: 'Kayıt işlemi başarısız'
                 });
@@ -48,7 +49,7 @@ export class AuthController {
             return res.status(201).json(result);
         } catch (error: any) {
             console.error('Registration error:', error);
-            return res.status(500).json({ 
+            return res.status(500).json({
                 error: error.message,
                 details: 'Sunucu hatası oluştu'
             });
@@ -57,11 +58,35 @@ export class AuthController {
 
     public login = async (req: Request, res: Response): Promise<Response> => {
         try {
-            const { email, password } = req.body;
-            const result = await this.authService.login(email, password);
+            const { username, password } = req.body;
+            const result = await this.authService.login(username, password);
 
             if (result.error) {
                 return res.status(400).json({ error: result.error });
+            }
+
+            // Check if user has admin or superadmin role
+            if (result.user) {
+                // Get user role from the database
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('role')
+                    .eq('id', result.user.id)
+                    .single();
+
+                if (error) {
+                    console.error('Error fetching user role:', error);
+                    return res.status(500).json({ error: 'Kullanıcı rolü kontrol edilirken bir hata oluştu' });
+                }
+
+                if (!data || (data.role !== 'admin' && data.role !== 'superadmin')) {
+                    return res.status(403).json({
+                        error: 'Yetkisiz erişim',
+                        details: 'Bu alana erişim için admin veya superadmin rolü gerekli'
+                    });
+                }
+
+                console.log(`User ${username} logged in with role: ${data.role}`);
             }
 
             return res.json({
