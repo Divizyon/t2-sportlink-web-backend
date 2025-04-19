@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Request, Response } from 'express';
 import { protect } from '../middleware/authMiddleware';
-import { register, login, logout, resetPassword, getCurrentUser, registerAdmin } from '../controllers/AuthController';
+import { register, login, logout, resetPassword, getCurrentUser, registerAdmin, resendEmailConfirmation } from '../controllers/AuthController';
 import { body } from 'express-validator';
 import { validateRequest } from '../middleware/validateRequest';
 
@@ -128,11 +128,12 @@ router.post('/register-admin', registerAdmin);
  *           schema:
  *             type: object
  *             required:
- *               - username
+ *               - email
  *               - password
  *             properties:
- *               username:
+ *               email:
  *                 type: string
+ *                 description: Kullanıcı email adresi veya kullanıcı adı
  *               password:
  *                 type: string
  *     responses:
@@ -146,7 +147,7 @@ router.post('/register-admin', registerAdmin);
 router.post(
   '/login',
   [
-    body('email').isEmail().withMessage('Geçerli bir email adresi giriniz'),
+    body('email').notEmpty().withMessage('Email veya kullanıcı adı gereklidir'),
     body('password').notEmpty().withMessage('Şifre gereklidir')
   ],
   validateRequest,
@@ -210,5 +211,37 @@ router.post('/reset-password', resetPassword);
  *         description: Yetkilendirme hatası
  */
 router.get('/me', protect, getCurrentUser);
+
+/**
+ * @swagger
+ * /api/auth/resend-confirmation:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Email doğrulama bağlantısını yeniden gönder
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Doğrulama e-postası tekrar gönderildi
+ *       400:
+ *         description: Geçersiz email
+ */
+router.post('/resend-confirmation',
+  [
+    body('email').isEmail().withMessage('Geçerli bir email adresi giriniz')
+  ],
+  validateRequest,
+  resendEmailConfirmation
+);
 
 export default router; 

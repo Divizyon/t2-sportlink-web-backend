@@ -18,9 +18,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-
-
-
+// BigInt için JSON serializer düzeltmesi
+// Uygulama genelinde BigInt değerleri string'e dönüştürmek için
+(BigInt.prototype as any).toJSON = function() {
+    return this.toString();
+};
 
 // Middleware
 app.use(cors());

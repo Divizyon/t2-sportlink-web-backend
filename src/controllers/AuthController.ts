@@ -3,38 +3,32 @@ import { findUserByEmail, createUser } from '../services/userService';
 import { RegisterDTO, LoginDTO, ResetPasswordDTO } from '../types/auth.types';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
+import { AuthService } from '../services/authService';
+
+// BigInt için JSON serializer düzeltmesi
+// Bu, BigInt değerleri string'e dönüştürmek için JSON.stringify'ı extend eder
+(BigInt.prototype as any).toJSON = function() {
+    return this.toString();
+};
+
+// AuthService instance oluştur
+const authService = new AuthService();
 
 export const register = async (req: Request, res: Response): Promise<Response> => {
     try {
         const userData: RegisterDTO = req.body;
         
-        // Check if user already exists
-        const existingUser = await findUserByEmail(userData.email);
-        if (existingUser) {
-            return res.status(400).json({ error: 'Email zaten kullanımda' });
+        // AuthService ile kullanıcı kaydı yap
+        const result = await authService.register(userData);
+        
+        if (result.error) {
+            return res.status(400).json({ error: result.error });
         }
         
-        // Create new user
-        const newUser = await createUser(userData);
-        
-        // Create JWT token
-        const token = jwt.sign(
-            { userId: newUser.id, email: newUser.email, role: newUser.role },
-            process.env.JWT_SECRET || 'default_secret',
-            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as SignOptions
-        );
-        
         return res.status(201).json({
-            message: 'Kullanıcı başarıyla kaydedildi',
-            token,
-            user: {
-                id: newUser.id,
-                email: newUser.email,
-                username: newUser.username,
-                first_name: newUser.first_name,
-                last_name: newUser.last_name,
-                role: newUser.role
-            }
+            message: result.message,
+            token: result.token,
+            user: result.user
         });
     } catch (error) {
         console.error('Kayıt hatası:', error);
@@ -44,43 +38,32 @@ export const register = async (req: Request, res: Response): Promise<Response> =
 
 export const login = async (req: Request, res: Response): Promise<Response> => {
     try {
-        const { email, username, password }: LoginDTO = req.body;
-        const loginIdentifier = email || username;
+        const loginData: LoginDTO = req.body;
         
-        if (!loginIdentifier) {
-            return res.status(400).json({ error: 'Email veya kullanıcı adı gereklidir' });
+        if (!loginData.email || !loginData.password) {
+            return res.status(400).json({ error: 'Email/kullanıcı adı ve şifre gereklidir' });
         }
         
-        // Find user by email or username
-        const user = await findUserByEmail(loginIdentifier);
-        if (!user) {
-            return res.status(401).json({ error: 'Geçersiz kimlik bilgileri' });
-        }
+        // AuthService'i kullanarak giriş yap
+        const result = await authService.login(loginData);
         
-        // Verify password
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid) {
-            return res.status(401).json({ error: 'Geçersiz kimlik bilgileri' });
+        if (result.error) {
+            // Email doğrulama hatası kontrolü
+            if (result.error.includes('Email adresinizi doğrulamanız gerekmektedir')) {
+                return res.status(403).json({ 
+                    error: result.error,
+                    needsEmailVerification: true,
+                    email: loginData.email
+                });
+            }
+            
+            return res.status(401).json({ error: result.error });
         }
-        
-        // Create JWT token
-        const token = jwt.sign(
-            { userId: user.id, email: user.email, role: user.role },
-            process.env.JWT_SECRET || 'default_secret',
-            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as SignOptions
-        );
         
         return res.status(200).json({
             message: 'Giriş başarılı',
-            token,
-            user: {
-                id: user.id,
-                email: user.email,
-                username: user.username,
-                first_name: user.first_name,
-                last_name: user.last_name,
-                role: user.role
-            }
+            token: result.token,
+            user: result.user
         });
     } catch (error) {
         console.error('Giriş hatası:', error);
@@ -90,6 +73,7 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
 
 export const logout = async (req: Request, res: Response): Promise<Response> => {
     try {
+        await authService.logout();
         return res.status(200).json({ message: 'Başarıyla çıkış yapıldı' });
     } catch (error: any) {
         return res.status(500).json({ error: error.message });
@@ -100,12 +84,36 @@ export const resetPassword = async (req: Request, res: Response): Promise<Respon
     try {
         const resetData: ResetPasswordDTO = req.body;
         
-        // Burada şifre sıfırlama işlemi yapılacak
-        // Örnek: Email gönderilmesi, token oluşturulması vb.
+        const result = await authService.resetPassword(resetData);
+        
+        if (result.error) {
+            return res.status(400).json({ error: result.error });
+        }
         
         return res.status(200).json({ message: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi' });
     } catch (error: any) {
         return res.status(500).json({ error: error.message });
+    }
+};
+
+export const resendEmailConfirmation = async (req: Request, res: Response): Promise<Response> => {
+    try {
+        const { email } = req.body;
+        
+        if (!email) {
+            return res.status(400).json({ error: 'Email adresi gereklidir' });
+        }
+        
+        const result = await authService.resendEmailConfirmation(email);
+        
+        if (result.error) {
+            return res.status(400).json({ error: result.error });
+        }
+        
+        return res.status(200).json({ message: 'Doğrulama e-postası tekrar gönderildi' });
+    } catch (error: any) {
+        console.error('Email onaylama hatası:', error);
+        return res.status(500).json({ error: 'Email onaylama işlemi başarısız oldu' });
     }
 };
 
@@ -134,33 +142,17 @@ export const registerAdmin = async (req: Request, res: Response): Promise<Respon
         // Set role to admin
         userData.role = 'admin';
         
-        // Check if user already exists
-        const existingUser = await findUserByEmail(userData.email);
-        if (existingUser) {
-            return res.status(400).json({ error: 'Email zaten kullanımda' });
+        // Admin kullanıcıyı AuthService aracılığıyla oluştur
+        const result = await authService.registerAdmin(userData, 'admin');
+        
+        if (result.error) {
+            return res.status(400).json({ error: result.error });
         }
-        
-        // Create new admin user
-        const newUser = await createUser(userData);
-        
-        // Create JWT token
-        const token = jwt.sign(
-            { userId: newUser.id, email: newUser.email, role: newUser.role },
-            process.env.JWT_SECRET || 'default_secret',
-            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as SignOptions
-        );
         
         return res.status(201).json({
             message: 'Admin kullanıcı başarıyla kaydedildi',
-            token,
-            user: {
-                id: newUser.id,
-                email: newUser.email,
-                username: newUser.username,
-                first_name: newUser.first_name,
-                last_name: newUser.last_name,
-                role: newUser.role
-            }
+            token: result.token,
+            user: result.user
         });
     } catch (error) {
         console.error('Admin kayıt hatası:', error);
