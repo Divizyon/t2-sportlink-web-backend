@@ -6,16 +6,16 @@ const router = express.Router();
 const eventController = new EventController();
 
 // Public routes
-router.get('/events', eventController.listEvents);
-router.get('/events/upcoming', eventController.getUpcomingEvents);
-router.get('/events/:id', eventController.getEventById);
-router.get('/events/slug/:slug', eventController.getEventBySlug);
+router.get('/', eventController.listEvents.bind(eventController));
+router.get('/upcoming', eventController.getUpcomingEvents.bind(eventController));
+router.get('/:id', eventController.getEventById.bind(eventController));
+router.get('/slug/:slug', eventController.getEventBySlug.bind(eventController));
 
 // Protected routes - require authentication
-router.post('/events', protect, eventController.createEvent);
-router.put('/events/:id', protect, eventController.updateEvent);
-router.delete('/events/:id', protect, eventController.deleteEvent);
-router.post('/events/:id/join', protect, eventController.joinEvent);
-router.delete('/events/:id/leave', protect, eventController.leaveEvent);
+router.post('/', protect, eventController.createEvent.bind(eventController));
+router.put('/:id', protect, eventController.updateEvent.bind(eventController));
+router.delete('/:id', protect, eventController.deleteEvent.bind(eventController));
+router.post('/:id/join', protect, eventController.joinEvent.bind(eventController));
+router.delete('/:id/leave', protect, eventController.leaveEvent.bind(eventController));
 
 export default router; 

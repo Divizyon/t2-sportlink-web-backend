@@ -16,11 +16,14 @@ export class EventController {
      */
     async createEvent(req: Request, res: Response) {
         try {
+            console.log('Received create event request:', req.body);
+            
             const { title, description, event_date, start_time, end_time, location_name,
                 location_latitude, location_longitude, max_participants, sport_id, status } = req.body;
 
             // Validate required fields
             if (!title || !description || !event_date || !start_time || !end_time || !location_name) {
+                console.log('Missing required fields:', { title, description, event_date, start_time, end_time, location_name });
                 return res.status(400).json({
                     success: false,
                     message: 'Missing required fields',
@@ -29,6 +32,8 @@ export class EventController {
 
             // Get user from request
             const userId = req.user?.userId;
+            console.log('User ID creating event:', userId);
+            
             if (!userId) {
                 return res.status(401).json({
                     success: false,
@@ -47,18 +52,20 @@ export class EventController {
                 location_latitude,
                 location_longitude,
                 max_participants,
-                sport_id,
+                sport_id: BigInt(sport_id),
                 status: status || 'active',
-                creator_id: String(userId)
+                creator_id: BigInt(userId)
             });
 
             if (error) {
+                console.error('Error in createEvent call:', error);
                 return res.status(400).json({
                     success: false,
                     message: error,
                 });
             }
 
+            console.log('Event created successfully:', data);
             return res.status(201).json({
                 success: true,
                 message: 'Event created successfully',
@@ -101,8 +108,8 @@ export class EventController {
                 });
             }
 
-            // Check if user is creator
-            if (eventResult.data.creator_id !== userId) {
+            // Check if user is creator - convert both to string for comparison
+            if (eventResult.data.creator_id.toString() !== userId.toString()) {
                 return res.status(403).json({
                     success: false,
                     message: 'You are not authorized to update this event',
@@ -171,8 +178,8 @@ export class EventController {
                 });
             }
 
-            // Check if user is creator
-            if (eventResult.data.creator_id !== userId) {
+            // Check if user is creator - convert both to string for comparison
+            if (eventResult.data.creator_id.toString() !== userId.toString()) {
                 return res.status(403).json({
                     success: false,
                     message: 'You are not authorized to delete this event',
@@ -342,9 +349,12 @@ export class EventController {
     async joinEvent(req: Request, res: Response) {
         try {
             const { id } = req.params;
+            console.log(`Received join request for event ID: ${id}`);
 
             // Get user from request
             const userId = req.user?.userId;
+            console.log(`User ID attempting to join: ${userId}`);
+            
             if (!userId) {
                 return res.status(401).json({
                     success: false,
@@ -352,15 +362,17 @@ export class EventController {
                 });
             }
 
-            const { success, error } = await this.eventService.joinEvent(id, String(userId));
+            const { success, error } = await this.eventService.joinEvent(id, userId.toString());
 
             if (!success) {
+                console.log(`Join event failed: ${error}`);
                 return res.status(400).json({
                     success: false,
                     message: error || 'Failed to join event',
                 });
             }
 
+            console.log(`User ${userId} successfully joined event ${id}`);
             return res.status(200).json({
                 success: true,
                 message: 'Successfully joined event',
@@ -381,9 +393,12 @@ export class EventController {
     async leaveEvent(req: Request, res: Response) {
         try {
             const { id } = req.params;
+            console.log(`Received leave request for event ID: ${id}`);
 
             // Get user from request
             const userId = req.user?.userId;
+            console.log(`User ID attempting to leave: ${userId}`);
+            
             if (!userId) {
                 return res.status(401).json({
                     success: false,
@@ -391,15 +406,17 @@ export class EventController {
                 });
             }
 
-            const { success, error } = await this.eventService.leaveEvent(id, String(userId));
+            const { success, error } = await this.eventService.leaveEvent(id, userId.toString());
 
             if (!success) {
+                console.log(`Leave event failed: ${error}`);
                 return res.status(400).json({
                     success: false,
                     message: error || 'Failed to leave event',
                 });
             }
 
+            console.log(`User ${userId} successfully left event ${id}`);
             return res.status(200).json({
                 success: true,
                 message: 'Successfully left event',

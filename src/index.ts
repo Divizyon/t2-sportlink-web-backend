@@ -8,9 +8,9 @@ import exampleRoutes from './routes/exampleRoutes';
 import eventRoutes from './routes/eventRoutes';
 import authRoutes from './routes/authRoutes';
 import profileRoutes from './routes/profileRoutes';
-import prisma from './config/prisma';
 import announcementRoutes from './routes/announcementRoutes';
 import newsRoutes from './routes/newsRoutes';
+import sportRoutes from './routes/sportRoutes';
 
 // Load environment variables
 dotenv.config();
@@ -18,8 +18,7 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// BigInt için JSON serializer düzeltmesi
-// Uygulama genelinde BigInt değerleri string'e dönüştürmek için
+
 (BigInt.prototype as any).toJSON = function() {
     return this.toString();
 };
@@ -36,9 +35,9 @@ app.use('/api/users', userRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/announcements', announcementRoutes);
+app.use('/api/events', eventRoutes);
 app.use('/api/news', newsRoutes);
-app.use('/api', eventRoutes);
-app.use('/api', exampleRoutes); 
+app.use('/api/sports', sportRoutes);
 
 // Ana sayfa
 app.get('/', (req: Request, res: Response) => {

@@ -1,24 +1,10 @@
 import { supabase } from '../config/supabase';
 import { generateSlug } from '../utils/stringUtils';
+import { Event, CreateEventDTO, UpdateEventDTO } from '../models/Event';
+import { PrismaClient } from '@prisma/client';
 
-interface Event {
-    id?: string;
-    title: string;
-    slug?: string;
-    description: string;
-    event_date: string;
-    start_time: string;
-    end_time: string;
-    location_name: string;
-    location_latitude?: number;
-    location_longitude?: number;
-    max_participants?: number;
-    status?: 'active' | 'cancelled' | 'completed';
-    sport_id?: string;
-    creator_id: string;
-    created_at?: string;
-    updated_at?: string;
-}
+// Prisma istemcisi oluştur
+const prisma = new PrismaClient();
 
 export class EventService {
     private readonly TABLE_NAME = 'events';
@@ -27,33 +13,52 @@ export class EventService {
     /**
      * Create a new event
      */
-    async createEvent(data: Partial<Event>) {
+    async createEvent(data: CreateEventDTO) {
         try {
+            console.log('Creating event with data:', JSON.stringify(data, null, 2));
+            
             // Generate slug from title
+            let eventData: any = {...data};
+            
             if (data.title) {
-                data.slug = generateSlug(data.title);
+                eventData.slug = generateSlug(data.title);
             }
 
             // Set timestamps
-            const now = new Date().toISOString();
-            data.created_at = now;
-            data.updated_at = now;
+            const now = new Date();
 
-            // Insert event into database
-            const { data: insertedEvent, error } = await supabase
-                .from(this.TABLE_NAME)
-                .insert(data)
-                .select('*')
-                .single();
+            // PrismaClient kullanarak etkinlik oluştur
+            const insertedEvent = await prisma.events.create({
+                data: {
+                    title: data.title,
+                    description: data.description,
+                    event_date: new Date(data.event_date),
+                    start_time: new Date(data.start_time),
+                    end_time: new Date(data.end_time),
+                    location_name: data.location_name,
+                    location_latitude: data.location_latitude,
+                    location_longitude: data.location_longitude,
+                    max_participants: data.max_participants,
+                    status: data.status || 'active',
+                    creator_id: data.creator_id,
+                    sport_id: data.sport_id,
+                    created_at: now,
+                    updated_at: now
+                }
+            });
 
-            if (error) {
-                console.error('Error creating event:', error);
-                return { error: error.message };
-            }
+            console.log('Event created successfully:', JSON.stringify(insertedEvent, null, 2));
 
-            return { data: insertedEvent, error: null };
+            const formattedEvent = {
+                ...insertedEvent,
+                id: insertedEvent.id.toString(),
+                creator_id: insertedEvent.creator_id.toString(),
+                sport_id: insertedEvent.sport_id.toString()
+            };
+
+            return { data: formattedEvent, error: null };
         } catch (error: any) {
-            console.error('Unexpected error in createEvent service:', error);
+            console.error('Error in createEvent service:', error);
             return { error: error.message || 'Failed to create event', data: null };
         }
     }
@@ -61,20 +66,22 @@ export class EventService {
     /**
      * Update an existing event
      */
-    async updateEvent(id: string, data: Partial<Event>) {
+    async updateEvent(id: string, data: UpdateEventDTO) {
         try {
             // Generate new slug if title changes
+            let eventData: any = {...data};
+            
             if (data.title) {
-                data.slug = generateSlug(data.title);
+                eventData.slug = generateSlug(data.title);
             }
 
             // Update timestamp
-            data.updated_at = new Date().toISOString();
+            eventData.updated_at = new Date().toISOString();
 
             // Update event in database
             const { data: updatedEvent, error } = await supabase
                 .from(this.TABLE_NAME)
-                .update(data)
+                .update(eventData)
                 .eq('id', id)
                 .select('*')
                 .single();
@@ -115,32 +122,78 @@ export class EventService {
     }
 
     /**
-     * Find an event by ID
+     * Find an event by ID using Prisma
      */
     async findEventById(id: string) {
         try {
-            const { data, error } = await supabase
-                .from(this.TABLE_NAME)
-                .select(`
-                    *,
-                    creator:creator_id(id, username, profile_image),
-                    sport:sport_id(id, name, icon),
-                    participants:${this.PARTICIPANTS_TABLE}(
-                        id,
-                        user_id,
-                        role,
-                        user:user_id(id, username, profile_image)
-                    )
-                `)
-                .eq('id', id)
-                .single();
+            // Prisma kullanarak etkinliği ve ilişkili verileri getir
+            const event = await prisma.events.findUnique({
+                where: {
+                    id: BigInt(id)
+                },
+                include: {
+                    creator: {
+                        select: {
+                            id: true,
+                            username: true,
+                            profile_picture: true
+                        }
+                    },
+                    sport: {
+                        select: {
+                            id: true,
+                            name: true,
+                            icon: true
+                        }
+                    },
+                    participants: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    profile_picture: true
+                                }
+                            }
+                        }
+                    }
+                }
+            });
 
-            if (error) {
-                console.error('Error finding event by ID:', error);
-                return { error: error.message, data: null };
+            if (!event) {
+                return { error: 'Event not found', data: null };
             }
 
-            return { data, error: null };
+            // İlişkileri olan event verisini düzgün şekilde dönüştürüp döndür
+            return { 
+                data: {
+                    ...event,
+                    id: event.id.toString(),
+                    creator_id: event.creator_id.toString(),
+                    sport_id: event.sport_id.toString(),
+                    creator: {
+                        id: event.creator.id.toString(),
+                        username: event.creator.username,
+                        profile_image: event.creator.profile_picture
+                    },
+                    sport: {
+                        id: event.sport.id.toString(),
+                        name: event.sport.name,
+                        icon: event.sport.icon
+                    },
+                    participants: event.participants.map((p: any) => ({
+                        event_id: p.event_id.toString(),
+                        user_id: p.user_id.toString(),
+                        role: p.role,
+                        user: p.user ? {
+                            id: p.user.id.toString(),
+                            username: p.user.username,
+                            profile_image: p.user.profile_picture
+                        } : null
+                    }))
+                }, 
+                error: null 
+            };
         } catch (error: any) {
             console.error('Unexpected error in findEventById service:', error);
             return { error: error.message || 'Failed to find event', data: null };
@@ -148,32 +201,83 @@ export class EventService {
     }
 
     /**
-     * Find an event by slug
+     * Find an event by slug using Prisma
      */
     async findEventBySlug(slug: string) {
         try {
-            const { data, error } = await supabase
-                .from(this.TABLE_NAME)
-                .select(`
-                    *,
-                    creator:creator_id(id, username, profile_image),
-                    sport:sport_id(id, name, icon),
-                    participants:${this.PARTICIPANTS_TABLE}(
-                        id,
-                        user_id,
-                        role,
-                        user:user_id(id, username, profile_image)
-                    )
-                `)
-                .eq('slug', slug)
-                .single();
+            // Prisma kullanarak etkinliği ve ilişkili verileri getir
+            // Not: Prisma şemasında slug olmaması durumuna karşı title kullanabiliriz
+            // veya slug eklemek için bir migrate yapılabilir
+            const event = await prisma.events.findFirst({
+                where: {
+                    title: {
+                        contains: slug.replace(/-/g, ' '), // Slugları tire ile ayırdıysak
+                        mode: 'insensitive'
+                    }
+                },
+                include: {
+                    creator: {
+                        select: {
+                            id: true,
+                            username: true,
+                            profile_picture: true
+                        }
+                    },
+                    sport: {
+                        select: {
+                            id: true,
+                            name: true,
+                            icon: true
+                        }
+                    },
+                    participants: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    profile_picture: true
+                                }
+                            }
+                        }
+                    }
+                }
+            });
 
-            if (error) {
-                console.error('Error finding event by slug:', error);
-                return { error: error.message, data: null };
+            if (!event) {
+                return { error: 'Event not found', data: null };
             }
 
-            return { data, error: null };
+            // İlişkileri olan event verisini düzgün şekilde dönüştürüp döndür
+            return { 
+                data: {
+                    ...event,
+                    id: event.id.toString(),
+                    creator_id: event.creator_id.toString(),
+                    sport_id: event.sport_id.toString(),
+                    creator: {
+                        id: event.creator.id.toString(),
+                        username: event.creator.username,
+                        profile_image: event.creator.profile_picture
+                    },
+                    sport: {
+                        id: event.sport.id.toString(),
+                        name: event.sport.name,
+                        icon: event.sport.icon
+                    },
+                    participants: event.participants.map((p: any) => ({
+                        event_id: p.event_id.toString(),
+                        user_id: p.user_id.toString(),
+                        role: p.role,
+                        user: p.user ? {
+                            id: p.user.id.toString(),
+                            username: p.user.username,
+                            profile_image: p.user.profile_picture
+                        } : null
+                    }))
+                }, 
+                error: null 
+            };
         } catch (error: any) {
             console.error('Unexpected error in findEventBySlug service:', error);
             return { error: error.message || 'Failed to find event', data: null };
@@ -181,41 +285,70 @@ export class EventService {
     }
 
     /**
-     * List events with pagination
+     * List events with pagination using Prisma
      */
     async listEvents(page: number, limit: number, activeOnly: boolean) {
         try {
-            // Calculate offset for pagination
-            const offset = (page - 1) * limit;
+            // Hesapla başlangıç offseti
+            const skip = (page - 1) * limit;
 
-            // Build query
-            let query = supabase
-                .from(this.TABLE_NAME)
-                .select(`
-                    *,
-                    creator:creator_id(id, username, profile_image),
-                    sport:sport_id(id, name, icon),
-                    participants:${this.PARTICIPANTS_TABLE}(id, user_id, role)
-                `, { count: 'exact' });
+            // Filtreleme koşullarını oluştur
+            const where = activeOnly ? { status: 'active' } : {};
 
-            // Filter by status if activeOnly is true
-            if (activeOnly) {
-                query = query.eq('status', 'active');
-            }
+            // Prisma ile verileri sorgula
+            const events = await prisma.events.findMany({
+                where,
+                include: {
+                    creator: {
+                        select: {
+                            id: true,
+                            username: true,
+                            profile_picture: true
+                        }
+                    },
+                    sport: {
+                        select: {
+                            id: true,
+                            name: true,
+                            icon: true
+                        }
+                    },
+                    participants: true
+                },
+                orderBy: {
+                    event_date: 'asc'
+                },
+                skip,
+                take: limit
+            });
 
-            // Add pagination
-            query = query.order('event_date', { ascending: true })
-                .range(offset, offset + limit - 1);
+            // Toplam kayıt sayısını getir
+            const count = await prisma.events.count({ where });
 
-            // Execute query
-            const { data, error, count } = await query;
+            // BigInt'leri string'e dönüştür ve formatla
+            const formattedEvents = events.map((event: any) => ({
+                ...event,
+                id: event.id.toString(),
+                creator_id: event.creator_id.toString(),
+                sport_id: event.sport_id.toString(),
+                creator: {
+                    id: event.creator.id.toString(),
+                    username: event.creator.username,
+                    profile_image: event.creator.profile_picture
+                },
+                sport: {
+                    id: event.sport.id.toString(),
+                    name: event.sport.name,
+                    icon: event.sport.icon
+                },
+                participants: event.participants.map((p: any) => ({
+                    event_id: p.event_id.toString(),
+                    user_id: p.user_id.toString(),
+                    role: p.role
+                }))
+            }));
 
-            if (error) {
-                console.error('Error listing events:', error);
-                return { error: error.message, data: null, count: 0 };
-            }
-
-            return { data, error: null, count };
+            return { data: formattedEvents, error: null, count };
         } catch (error: any) {
             console.error('Unexpected error in listEvents service:', error);
             return { error: error.message || 'Failed to list events', data: null, count: 0 };
@@ -223,31 +356,67 @@ export class EventService {
     }
 
     /**
-     * Get upcoming events
+     * Get upcoming events using Prisma
      */
     async getUpcomingEvents(limit: number) {
         try {
-            const today = new Date().toISOString().split('T')[0];
+            const today = new Date();
 
-            const { data, error } = await supabase
-                .from(this.TABLE_NAME)
-                .select(`
-                    *,
-                    creator:creator_id(id, username, profile_image),
-                    sport:sport_id(id, name, icon),
-                    participants:${this.PARTICIPANTS_TABLE}(id)
-                `)
-                .eq('status', 'active')
-                .gte('event_date', today)
-                .order('event_date', { ascending: true })
-                .limit(limit);
+            // Prisma ile yaklaşan etkinlikleri sorgula
+            const events = await prisma.events.findMany({
+                where: {
+                    status: 'active',
+                    event_date: {
+                        gte: today
+                    }
+                },
+                include: {
+                    creator: {
+                        select: {
+                            id: true,
+                            username: true,
+                            profile_picture: true
+                        }
+                    },
+                    sport: {
+                        select: {
+                            id: true,
+                            name: true,
+                            icon: true
+                        }
+                    },
+                    participants: true
+                },
+                orderBy: {
+                    event_date: 'asc'
+                },
+                take: limit
+            });
 
-            if (error) {
-                console.error('Error getting upcoming events:', error);
-                return { error: error.message, data: null };
-            }
+            // BigInt'leri string'e dönüştür ve formatla
+            const formattedEvents = events.map((event: any) => ({
+                ...event,
+                id: event.id.toString(),
+                creator_id: event.creator_id.toString(),
+                sport_id: event.sport_id.toString(),
+                creator: {
+                    id: event.creator.id.toString(),
+                    username: event.creator.username,
+                    profile_image: event.creator.profile_picture
+                },
+                sport: {
+                    id: event.sport.id.toString(),
+                    name: event.sport.name,
+                    icon: event.sport.icon
+                },
+                participants: event.participants.map((p: any) => ({
+                    event_id: p.event_id.toString(),
+                    user_id: p.user_id.toString(),
+                    role: p.role
+                }))
+            }));
 
-            return { data, error: null };
+            return { data: formattedEvents, error: null };
         } catch (error: any) {
             console.error('Unexpected error in getUpcomingEvents service:', error);
             return { error: error.message || 'Failed to get upcoming events', data: null };
@@ -255,108 +424,101 @@ export class EventService {
     }
 
     /**
-     * Join an event
+     * Join an event using Prisma
      */
     async joinEvent(eventId: string, userId: string, role: string = 'participant') {
         try {
-            // Check if already joined
-            const { data: existingParticipant, error: checkError } = await supabase
-                .from(this.PARTICIPANTS_TABLE)
-                .select('*')
-                .eq('event_id', eventId)
-                .eq('user_id', userId)
-                .maybeSingle();
-
-            if (checkError) {
-                console.error('Error checking existing participant:', checkError);
-                return { success: false, error: checkError.message };
-            }
+            console.log(`User ${userId} attempting to join event ${eventId}`);
+            
+            // Check if user already joined
+            const existingParticipant = await prisma.event_Participants.findUnique({
+                where: {
+                    event_id_user_id: {
+                        event_id: BigInt(eventId),
+                        user_id: BigInt(userId)
+                    }
+                }
+            });
 
             if (existingParticipant) {
+                console.log(`User ${userId} already joined event ${eventId}`);
                 return { success: false, error: 'You are already participating in this event' };
             }
 
             // Check if event has reached max participants
-            const { data, error: eventError } = await supabase
-                .from(this.TABLE_NAME)
-                .select('max_participants, participants:' + this.PARTICIPANTS_TABLE + '(id)')
-                .eq('id', eventId)
-                .single();
+            const event = await prisma.events.findUnique({
+                where: {
+                    id: BigInt(eventId)
+                },
+                include: {
+                    participants: true
+                }
+            });
 
-            if (eventError) {
-                console.error('Error checking event capacity:', eventError);
-                return { success: false, error: eventError.message };
+            if (!event) {
+                console.log(`Event ${eventId} not found`);
+                return { success: false, error: 'Event not found' };
             }
 
-            // Type safety with any
-            const eventData = data as any;
-            if (eventData &&
-                typeof eventData.max_participants === 'number' &&
-                Array.isArray(eventData.participants) &&
-                eventData.max_participants > 0 &&
-                eventData.participants.length >= eventData.max_participants) {
+            if (event.max_participants > 0 && event.participants.length >= event.max_participants) {
+                console.log(`Event ${eventId} has reached maximum capacity`);
                 return { success: false, error: 'This event has reached maximum capacity' };
             }
 
             // Join event
-            const { error: joinError } = await supabase
-                .from(this.PARTICIPANTS_TABLE)
-                .insert({
-                    event_id: eventId,
-                    user_id: userId,
+            const participant = await prisma.event_Participants.create({
+                data: {
+                    event_id: BigInt(eventId),
+                    user_id: BigInt(userId),
                     role,
-                    joined_at: new Date().toISOString()
-                });
+                    joined_at: new Date()
+                }
+            });
 
-            if (joinError) {
-                console.error('Error joining event:', joinError);
-                return { success: false, error: joinError.message };
-            }
-
+            console.log(`User ${userId} successfully joined event ${eventId}`);
             return { success: true, error: null };
         } catch (error: any) {
-            console.error('Unexpected error in joinEvent service:', error);
+            console.error(`Error in joinEvent service: ${error.message}`, error);
             return { success: false, error: error.message || 'Failed to join event' };
         }
     }
 
     /**
-     * Leave an event
+     * Leave an event using Prisma
      */
     async leaveEvent(eventId: string, userId: string) {
         try {
+            console.log(`User ${userId} attempting to leave event ${eventId}`);
+            
             // Check if user is a participant
-            const { data: participant, error: checkError } = await supabase
-                .from(this.PARTICIPANTS_TABLE)
-                .select('*')
-                .eq('event_id', eventId)
-                .eq('user_id', userId)
-                .maybeSingle();
-
-            if (checkError) {
-                console.error('Error checking participant:', checkError);
-                return { success: false, error: checkError.message };
-            }
+            const participant = await prisma.event_Participants.findUnique({
+                where: {
+                    event_id_user_id: {
+                        event_id: BigInt(eventId),
+                        user_id: BigInt(userId)
+                    }
+                }
+            });
 
             if (!participant) {
+                console.log(`User ${userId} is not participating in event ${eventId}`);
                 return { success: false, error: 'You are not participating in this event' };
             }
 
             // Delete participation record
-            const { error: leaveError } = await supabase
-                .from(this.PARTICIPANTS_TABLE)
-                .delete()
-                .eq('event_id', eventId)
-                .eq('user_id', userId);
+            await prisma.event_Participants.delete({
+                where: {
+                    event_id_user_id: {
+                        event_id: BigInt(eventId),
+                        user_id: BigInt(userId)
+                    }
+                }
+            });
 
-            if (leaveError) {
-                console.error('Error leaving event:', leaveError);
-                return { success: false, error: leaveError.message };
-            }
-
+            console.log(`User ${userId} successfully left event ${eventId}`);
             return { success: true, error: null };
         } catch (error: any) {
-            console.error('Unexpected error in leaveEvent service:', error);
+            console.error(`Error in leaveEvent service: ${error.message}`, error);
             return { success: false, error: error.message || 'Failed to leave event' };
         }
     }
