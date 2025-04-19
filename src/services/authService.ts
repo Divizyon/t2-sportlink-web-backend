@@ -1,25 +1,38 @@
 import { supabase, supabaseAdmin } from '../config/supabase';
 import { RegisterDTO, LoginDTO, AuthResponse, ResetPasswordDTO } from '../types/auth.types';
 import { DatabaseService } from './DatabaseService';
+import { PrismaClient } from '@prisma/client';
 
 export class AuthService {
     private databaseService: DatabaseService;
+    private prisma: PrismaClient;
 
     constructor() {
         this.databaseService = new DatabaseService();
+        this.prisma = new PrismaClient();
     }
 
     async register(data: RegisterDTO): Promise<AuthResponse> {
         try {
             console.log('Starting registration process for:', data.email);
 
-            // Önce kullanıcı var mı kontrol et
-            const { data: existingUser } = await supabase.auth.getUser();
-            if (existingUser?.user) {
+            // Email ile kullanıcı var mı kontrol et
+            const existingUser = await this.prisma.users.findFirst({
+                where: {
+                    OR: [
+                        { email: data.email },
+                        { username: data.username }
+                    ]
+                }
+            });
+
+            if (existingUser) {
                 return {
                     user: null,
                     session: null,
-                    error: 'User already exists'
+                    error: existingUser.email === data.email ? 
+                        'Bu email adresi zaten kullanımda' : 
+                        'Bu kullanıcı adı zaten kullanımda'
                 };
             }
 
@@ -30,7 +43,7 @@ export class AuthService {
                 options: {
                     data: {
                         name: data.name,
-                        username: data.username || data.email.split('@')[0] // Varsayılan olarak email'in @ işaretinden önceki kısmını kullan
+                        username: data.username || data.email.split('@')[0]
                     }
                 }
             });
@@ -50,19 +63,41 @@ export class AuthService {
                 throw new Error('No user data returned');
             }
 
+            // Users tablosuna kayıt
+            try {
+                const newUser = await this.prisma.users.create({
+                    data: {
+                        username: data.username || data.email.split('@')[0],
+                        email: data.email,
+                        password: '', // Şifre Supabase Auth'da saklanıyor
+                        first_name: data.name || '',
+                        last_name: '',
+                        phone: '',
+                        profile_picture: '',
+                        default_location_latitude: 0,
+                        default_location_longitude: 0,
+                        role: 'user'
+                    }
+                });
+                console.log('User created in database:', newUser);
+            } catch (dbError) {
+                console.error('Database error:', dbError);
+                // Veritabanı hatası durumunda Supabase kaydını da sil
+                await supabase.auth.admin.deleteUser(authData.user.id);
+                throw new Error('Veritabanı kaydı oluşturulamadı');
+            }
+
             // Profil oluştur
             console.log('Creating profile for user:', authData.user.id);
             const { data: profile, error: profileError } = await this.databaseService.createProfile(
                 authData.user.id,
                 {
                     full_name: data.name,
-                    // 'username' property removed as it does not exist in the 'Partial<{ id: string; created_at: string; user_id: string; full_name: string | null; avatar_url: string | null; website: string | null; updated_at: string | null; }>' type
                 }
             );
 
             if (profileError) {
                 console.error('Profile creation error:', profileError);
-                // Profil oluşturma hatası olsa bile kullanıcı kaydını tamamla
             } else {
                 console.log('Profile created successfully:', profile);
             }
@@ -91,108 +126,40 @@ export class AuthService {
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             
             if (!emailRegex.test(username)) {
-                // Username email formatında değil, profil tablosundan kullanıcıyı bul
-                try {
-                    // TODO: Profile tablosunda username araması
-                    // Burada bir query yapılmalı ancak şu an için database servisinde bu method yok
-                    // Şimdilik hata döndürelim
-                    
-                    // Gerçek implementasyon için:
-                    const { data: userProfile, error } = await supabase
-                        .from('profiles')
-                        .select('user_id')
-                        .eq('username', username)
-                        .single();
-                    
-                    if (error || !userProfile) {
-                        console.error('Username lookup error:', error || 'User not found');
-                        return {
-                            user: null, 
-                            session: null, 
-                            error: 'Kullanıcı adı bulunamadı'
-                        };
-                    }
-                    
-                    // Kullanıcı ID'si ile kullanıcının email adresini al
-                    const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userProfile.user_id);
-                    
-                    if (userError || !userData?.user?.email) {
-                        console.error('User lookup error:', userError || 'Email not found');
-                        return {
-                            user: null, 
-                            session: null, 
-                            error: 'Kullanıcı bilgileri alınamadı'
-                        };
-                    }
-                    
-                    email = userData.user.email;
-                    
-                } catch (lookupError) {
-                    console.error('Username lookup error:', lookupError);
+                // Username ile kullanıcıyı bul
+                const { data: userData, error: userError } = await supabase
+                    .from('users')
+                    .select('email')
+                    .eq('username', username)
+                    .single();
+                
+                if (userError || !userData?.email) {
+                    console.error('Username lookup error:', userError || 'Email not found');
                     return {
                         user: null,
                         session: null,
-                        error: 'Kullanıcı adı bulunamadı. Lütfen email adresinizle giriş yapın.'
+                        error: 'Kullanıcı adı bulunamadı'
                     };
                 }
+                
+                email = userData.email;
             }
             
-            // Şimdi email ile giriş yapabiliriz
+            // Email ile giriş yap
             const { data, error } = await supabase.auth.signInWithPassword({
                 email,
                 password
             });
 
-            console.log('Login response:', {
-                success: !!data,
-                error: error?.message,
-                userId: data?.user?.id
-            });
-
-            // Email doğrulama hatasını bypass et
-            if (error && error.message === 'Email not confirmed') {
-                console.log('Bypassing email confirmation...');
-
-                try {
-                    // Önce kullanıcıyı bul
-                    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-                    if (userError || !user) {
-                        throw userError || new Error('User not found');
-                    }
-
-                    // Email'i doğrudan doğrula
-                    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-                        user.id,
-                        { email_confirm: true }
-                    );
-
-                    if (updateError) {
-                        throw updateError;
-                    }
-
-                    // Tekrar giriş dene
-                    const { data: newAuthData, error: newAuthError } = await supabase.auth.signInWithPassword({
-                        email,
-                        password
-                    });
-
-                    if (newAuthError) {
-                        throw newAuthError;
-                    }
-
-                    return {
-                        user: newAuthData.user,
-                        session: newAuthData.session
-                    };
-                } catch (adminError: any) {
-                    console.error('Admin operation error:', adminError);
-                    throw adminError;
-                }
-            }
-
             if (error) {
                 console.error('Login error:', error);
+                if (error.message === 'Email not confirmed') {
+                    return {
+                        user: null,
+                        session: null,
+                        error: 'Email adresinizi doğrulamanız gerekmektedir. Lütfen email kutunuzu kontrol edin.'
+                    };
+                }
                 throw error;
             }
 
@@ -206,7 +173,11 @@ export class AuthService {
             };
         } catch (error: any) {
             console.error('Login process error:', error);
-            return { user: null, session: null, error: error.message };
+            return {
+                user: null,
+                session: null,
+                error: error.message
+            };
         }
     }
 
@@ -231,6 +202,24 @@ export class AuthService {
             if (error) throw error;
             return { user };
         } catch (error: any) {
+            return { error: error.message };
+        }
+    }
+
+    async getUserRole(email: string): Promise<{ role?: string; error?: string }> {
+        try {
+            const userData = await this.prisma.users.findFirst({
+                where: { email },
+                select: { role: true }
+            });
+
+            if (!userData) {
+                return { error: 'Kullanıcı bulunamadı' };
+            }
+
+            return { role: userData.role };
+        } catch (error: any) {
+            console.error('Error fetching user role:', error);
             return { error: error.message };
         }
     }

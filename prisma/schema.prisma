@@ -39,6 +39,8 @@ model Users {
   adminLogs            Admin_Logs[]
   reportsMade          Reports[]    @relation("Reporter")
   reportsReceived      Reports[]    @relation("Reported")
+
+  @@map("users")
 }
 
 model Sports {

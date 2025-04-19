@@ -65,34 +65,26 @@ export class AuthController {
                 return res.status(400).json({ error: result.error });
             }
 
-            // Check if user has admin or superadmin role
+            // Kullanıcı rolünü al
             if (result.user) {
-                // Get user role from the database
-                const { data, error } = await supabase
-                    .from('users')
-                    .select('role')
-                    .eq('id', result.user.id)
-                    .single();
+                const { role, error: roleError } = await this.authService.getUserRole(result.user.email);
 
-                if (error) {
-                    console.error('Error fetching user role:', error);
+                if (roleError) {
+                    console.error('Error fetching user role:', roleError);
                     return res.status(500).json({ error: 'Kullanıcı rolü kontrol edilirken bir hata oluştu' });
                 }
 
-                if (!data || (data.role !== 'admin' && data.role !== 'superadmin')) {
-                    return res.status(403).json({
-                        error: 'Yetkisiz erişim',
-                        details: 'Bu alana erişim için admin veya superadmin rolü gerekli'
-                    });
-                }
-
-                console.log(`User ${username} logged in with role: ${data.role}`);
+                // Kullanıcı bilgilerini ve oturum bilgilerini döndür
+                return res.json({
+                    user: {
+                        ...result.user,
+                        role: role
+                    },
+                    session: result.session
+                });
             }
 
-            return res.json({
-                user: result.user,
-                session: result.session
-            });
+            return res.status(400).json({ error: 'Giriş başarısız' });
         } catch (error: any) {
             return res.status(500).json({ error: error.message });
         }
