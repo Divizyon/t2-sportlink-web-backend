@@ -137,13 +137,18 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<Respo
 
 export const registerAdmin = async (req: Request, res: Response): Promise<Response> => {
     try {
+        // @ts-ignore - request.user yetkilendirme middleware'i tarafından eklenir
+        const currentUser = req.user;
+        
+        // Sadece superadmin rolüne sahip kullanıcılar admin ekleyebilir
+        if (!currentUser || currentUser.role !== 'superadmin') {
+            return res.status(403).json({ error: 'Bu işlem için yetkiniz bulunmamaktadır. Sadece superadmin admin ekleyebilir.' });
+        }
+        
         const userData: RegisterDTO = req.body;
         
-        // Set role to admin
-        userData.role = 'admin';
-        
         // Admin kullanıcıyı AuthService aracılığıyla oluştur
-        const result = await authService.registerAdmin(userData, 'admin');
+        const result = await authService.registerAdmin(userData);
         
         if (result.error) {
             return res.status(400).json({ error: result.error });

@@ -22,7 +22,7 @@ export const createUser = async (userData: CreateUserDTO) => {
       ...userData,
       password: hashedPassword,
       profile_picture: userData.profile_picture || '',
-      role: userData.role || 'user'
+      role: 'user'
     }
   });
 };

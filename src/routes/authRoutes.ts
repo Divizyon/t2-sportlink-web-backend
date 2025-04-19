@@ -47,9 +47,6 @@ const router = Router();
  *                 type: number
  *               default_location_longitude:
  *                 type: number
- *               role:
- *                 type: string
- *                 enum: [admin, user, coach]
  *     responses:
  *       201:
  *         description: Kullanıcı başarıyla oluşturuldu
@@ -80,7 +77,9 @@ router.post(
  *   post:
  *     tags:
  *       - Authentication
- *     summary: Yeni admin veya süper admin kullanıcı kaydı
+ *     summary: Yeni admin kullanıcı kaydı (Sadece superadmin tarafından)
+ *     security:
+ *       - bearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -90,6 +89,12 @@ router.post(
  *             required:
  *               - email
  *               - password
+ *               - username
+ *               - first_name
+ *               - last_name
+ *               - phone
+ *               - default_location_latitude
+ *               - default_location_longitude
  *             properties:
  *               email:
  *                 type: string
@@ -97,23 +102,29 @@ router.post(
  *               password:
  *                 type: string
  *                 minLength: 6
- *               name:
- *                 type: string
  *               username:
  *                 type: string
- *                 description: Kullanıcı adı (varsayılan olarak email'in @ işaretinden önceki kısmı kullanılır)
- *               role:
+ *               first_name:
  *                 type: string
- *                 enum: [admin, superadmin]
- *                 default: admin
- *                 description: Kullanıcı rolü - admin veya superadmin
+ *               last_name:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               profile_picture:
+ *                 type: string
+ *               default_location_latitude:
+ *                 type: number
+ *               default_location_longitude:
+ *                 type: number
  *     responses:
  *       201:
  *         description: Admin kullanıcı başarıyla oluşturuldu
  *       400:
  *         description: Geçersiz input
+ *       403:
+ *         description: Yetki hatası - Sadece superadmin admin ekleyebilir
  */
-router.post('/register-admin', registerAdmin);
+router.post('/register-admin', protect, registerAdmin);
 
 /**
  * @swagger

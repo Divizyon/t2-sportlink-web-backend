@@ -26,7 +26,7 @@ export interface CreateUserDTO {
   profile_picture?: string;
   default_location_latitude: number;
   default_location_longitude: number;
-  role?: 'admin' | 'user' | 'coach';
+  // role dahili olarak tanımlanır, dışarıdan gelmesin
 }
 
 export interface LoginDTO {
