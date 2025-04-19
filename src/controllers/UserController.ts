@@ -3,13 +3,24 @@ import * as userService from '../services/userService';
 
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
-    const users = await userService.getAllUsers();
-    
+    const page = parseInt(req.query.page as string) || 1;
+    const pageSize = parseInt(req.query.pageSize as string) || 10;
+
+    const skip = (page - 1) * pageSize;
+    const users = await userService.getAllUsers(skip, pageSize);
+    const total = users.length; // Basitleştirilmiş toplam sayı
+
     res.status(200).json({
       status: 'success',
       results: users.length,
       data: {
         users
+      },
+      pagination: {
+        page,
+        pageSize,
+        total,
+        pages: Math.ceil(total / pageSize)
       }
     });
   } catch (error) {
@@ -32,7 +43,7 @@ export const getUserById = async (req: Request, res: Response) => {
         message: 'Kullanıcı bulunamadı.'
       });
     }
-    
+
     res.status(200).json({
       status: 'success',
       data: {

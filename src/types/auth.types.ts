@@ -24,6 +24,7 @@ export interface AuthResponse {
     token: string;
     message: string;
     error?: string;
+    session?: any;
 }
 
 export interface ResetPasswordDTO {

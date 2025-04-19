@@ -125,4 +125,45 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<Respo
     } catch (error: any) {
         return res.status(500).json({ error: error.message });
     }
+};
+
+export const registerAdmin = async (req: Request, res: Response): Promise<Response> => {
+    try {
+        const userData: RegisterDTO = req.body;
+        
+        // Set role to admin
+        userData.role = 'admin';
+        
+        // Check if user already exists
+        const existingUser = await findUserByEmail(userData.email);
+        if (existingUser) {
+            return res.status(400).json({ error: 'Email zaten kullanımda' });
+        }
+        
+        // Create new admin user
+        const newUser = await createUser(userData);
+        
+        // Create JWT token
+        const token = jwt.sign(
+            { userId: newUser.id, email: newUser.email, role: newUser.role },
+            process.env.JWT_SECRET || 'default_secret',
+            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as SignOptions
+        );
+        
+        return res.status(201).json({
+            message: 'Admin kullanıcı başarıyla kaydedildi',
+            token,
+            user: {
+                id: newUser.id,
+                email: newUser.email,
+                username: newUser.username,
+                first_name: newUser.first_name,
+                last_name: newUser.last_name,
+                role: newUser.role
+            }
+        });
+    } catch (error) {
+        console.error('Admin kayıt hatası:', error);
+        return res.status(500).json({ error: 'Kayıt işlemi başarısız oldu' });
+    }
 }; 
