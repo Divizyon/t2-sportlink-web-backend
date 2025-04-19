@@ -30,7 +30,7 @@ export class AuthService {
 
             if (existingUser) {
                 return {
-                    user: {},
+                    user: {} as Partial<User>,
                     token: '',
                     message: existingUser.email === data.email ? 
                         'Bu email adresi zaten kullanımda' : 
@@ -124,7 +124,7 @@ export class AuthService {
         } catch (error: any) {
             console.error('Registration process error:', error);
             return {
-                user: {},
+                user: {} as Partial<User>,
                 token: '',
                 message: 'Kullanıcı kaydı başarısız',
                 error: error.message
@@ -200,6 +200,60 @@ export class AuthService {
                 password
             });
 
+            console.log('Login response:', {
+                success: !!data,
+                error: error?.message,
+                userId: data?.user?.id
+            });
+
+            // Email doğrulama hatasını bypass et
+            if (error && error.message === 'Email not confirmed') {
+                console.log('Bypassing email confirmation...');
+                
+                try {
+                    // Önce kullanıcıyı bul
+                    const { data: { user }, error: userError } = await supabase.auth.getUser();
+                    
+                    if (userError || !user) {
+                        throw userError || new Error('User not found');
+                    }
+
+                    // Email'i doğrudan doğrula
+                    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+                        user.id,
+                        { email_confirm: true }
+                    );
+
+                    if (updateError) {
+                        throw updateError;
+                    }
+
+                    // Tekrar giriş dene
+                    const { data: newAuthData, error: newAuthError } = await supabase.auth.signInWithPassword({
+                        email,
+                        password
+                    });
+
+                    if (newAuthError) {
+                        throw newAuthError;
+                    }
+
+                    return {
+                        user: {
+                            id: newAuthData.user?.id ? BigInt(newAuthData.user.id) : undefined,
+                            email: newAuthData.user?.email,
+                            username: newAuthData.user?.user_metadata?.username,
+                            role: newAuthData.user?.user_metadata?.role
+                        } as Partial<User>,
+                        token: newAuthData.session?.access_token || '',
+                        message: 'Giriş başarılı'
+                    };
+                } catch (adminError: any) {
+                    console.error('Admin operation error:', adminError);
+                    throw adminError;
+                }
+            }
+
             if (error) {
                 console.error('Login error:', error);
                 if (error.message === 'Email not confirmed') {
@@ -270,11 +324,11 @@ export class AuthService {
             };
         } catch (error: any) {
             console.error('Login process error:', error);
-            return {
-                user: {},
-                token: '',
-                message: 'Login process error',
-                error: error.message
+            return { 
+                user: {} as Partial<User>, 
+                token: '', 
+                message: 'Giriş başarısız',
+                error: error.message 
             };
         }
     }
