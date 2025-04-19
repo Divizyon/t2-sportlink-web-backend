@@ -1,14 +1,14 @@
 import { Request, Response } from 'express';
-import { UserService } from '../services/userService';
-
-const userService = new UserService();
+import * as userService from '../services/userService';
 
 export const getAllUsers = async (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const pageSize = parseInt(req.query.pageSize as string) || 10;
 
-    const { users, total } = await userService.listUsers(page, pageSize);
+    const skip = (page - 1) * pageSize;
+    const users = await userService.getAllUsers(skip, pageSize);
+    const total = users.length; // Basitleştirilmiş toplam sayı
 
     res.status(200).json({
       status: 'success',
@@ -35,7 +35,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
 export const getUserById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const user = await userService.findUserById(id);
+    const user = await userService.findUserById(BigInt(id));
 
     if (!user) {
       return res.status(404).json({

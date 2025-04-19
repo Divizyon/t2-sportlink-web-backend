@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { EventService } from '../services/EventService';
-import { AuthService } from '../services/AuthService';
+import { AuthService } from '../services/authService';
 
 export class EventController {
     private eventService: EventService;
@@ -28,7 +28,7 @@ export class EventController {
             }
 
             // Get user from request
-            const userId = req.user?.id;
+            const userId = req.user?.userId;
             if (!userId) {
                 return res.status(401).json({
                     success: false,
@@ -49,7 +49,7 @@ export class EventController {
                 max_participants,
                 sport_id,
                 status: status || 'active',
-                creator_id: userId
+                creator_id: String(userId)
             });
 
             if (error) {
@@ -84,7 +84,7 @@ export class EventController {
                 location_latitude, location_longitude, max_participants, sport_id, status } = req.body;
 
             // Get user from request
-            const userId = req.user?.id;
+            const userId = req.user?.userId;
             if (!userId) {
                 return res.status(401).json({
                     success: false,
@@ -154,7 +154,7 @@ export class EventController {
             const { id } = req.params;
 
             // Get user from request
-            const userId = req.user?.id;
+            const userId = req.user?.userId;
             if (!userId) {
                 return res.status(401).json({
                     success: false,
@@ -344,7 +344,7 @@ export class EventController {
             const { id } = req.params;
 
             // Get user from request
-            const userId = req.user?.id;
+            const userId = req.user?.userId;
             if (!userId) {
                 return res.status(401).json({
                     success: false,
@@ -352,7 +352,7 @@ export class EventController {
                 });
             }
 
-            const { success, error } = await this.eventService.joinEvent(id, userId);
+            const { success, error } = await this.eventService.joinEvent(id, String(userId));
 
             if (!success) {
                 return res.status(400).json({
@@ -383,7 +383,7 @@ export class EventController {
             const { id } = req.params;
 
             // Get user from request
-            const userId = req.user?.id;
+            const userId = req.user?.userId;
             if (!userId) {
                 return res.status(401).json({
                     success: false,
@@ -391,7 +391,7 @@ export class EventController {
                 });
             }
 
-            const { success, error } = await this.eventService.leaveEvent(id, userId);
+            const { success, error } = await this.eventService.leaveEvent(id, String(userId));
 
             if (!success) {
                 return res.status(400).json({

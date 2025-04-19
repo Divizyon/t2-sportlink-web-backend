@@ -10,12 +10,12 @@ export class ProfileController {
 
     getProfile = async (req: Request, res: Response): Promise<Response> => {
         try {
-            const userId = req.user?.id;
+            const userId = req.user?.userId;
             if (!userId) {
                 return res.status(401).json({ error: 'Unauthorized' });
             }
 
-            const { data, error } = await this.databaseService.getProfile(userId);
+            const { data, error } = await this.databaseService.getProfile(String(userId));
             if (error) {
                 return res.status(400).json({ error });
             }
@@ -28,12 +28,12 @@ export class ProfileController {
 
     updateProfile = async (req: Request, res: Response): Promise<Response> => {
         try {
-            const userId = req.user?.id;
+            const userId = req.user?.userId;
             if (!userId) {
                 return res.status(401).json({ error: 'Unauthorized' });
             }
 
-            const { data, error } = await this.databaseService.updateProfile(userId, req.body);
+            const { data, error } = await this.databaseService.updateProfile(String(userId), req.body);
             if (error) {
                 return res.status(400).json({ error });
             }

@@ -44,10 +44,10 @@ export const register = async (req: Request, res: Response): Promise<Response> =
 
 export const login = async (req: Request, res: Response): Promise<Response> => {
     try {
-        const { email, password }: LoginDTO = req.body;
+        const { username, password }: LoginDTO = req.body;
         
-        // Find user by email
-        const user = await findUserByEmail(email);
+        // Find user by email or username
+        const user = await findUserByEmail(username);
         if (!user) {
             return res.status(401).json({ error: 'Geçersiz kimlik bilgileri' });
         }
@@ -119,5 +119,46 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<Respo
         return res.status(200).json({ user: req.user });
     } catch (error: any) {
         return res.status(500).json({ error: error.message });
+    }
+};
+
+export const registerAdmin = async (req: Request, res: Response): Promise<Response> => {
+    try {
+        const userData: RegisterDTO = req.body;
+        
+        // Set role to admin
+        userData.role = 'admin';
+        
+        // Check if user already exists
+        const existingUser = await findUserByEmail(userData.email);
+        if (existingUser) {
+            return res.status(400).json({ error: 'Email zaten kullanımda' });
+        }
+        
+        // Create new admin user
+        const newUser = await createUser(userData);
+        
+        // Create JWT token
+        const token = jwt.sign(
+            { userId: newUser.id, email: newUser.email, role: newUser.role },
+            process.env.JWT_SECRET || 'default_secret',
+            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as SignOptions
+        );
+        
+        return res.status(201).json({
+            message: 'Admin kullanıcı başarıyla kaydedildi',
+            token,
+            user: {
+                id: newUser.id,
+                email: newUser.email,
+                username: newUser.username,
+                first_name: newUser.first_name,
+                last_name: newUser.last_name,
+                role: newUser.role
+            }
+        });
+    } catch (error) {
+        console.error('Admin kayıt hatası:', error);
+        return res.status(500).json({ error: 'Kayıt işlemi başarısız oldu' });
     }
 }; 

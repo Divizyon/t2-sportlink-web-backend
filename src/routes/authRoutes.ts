@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Request, Response } from 'express';
 import { protect } from '../middleware/authMiddleware';
-import { register, login, logout, resetPassword, getCurrentUser } from '../controllers/AuthController';
+import { register, login, logout, resetPassword, getCurrentUser, registerAdmin } from '../controllers/AuthController';
 import { body } from 'express-validator';
 import { validateRequest } from '../middleware/validateRequest';
 
@@ -113,7 +113,7 @@ router.post(
  *       400:
  *         description: Geçersiz input
  */
-router.post('/register-admin', authController.registerAdmin);
+router.post('/register-admin', registerAdmin);
 
 /**
  * @swagger

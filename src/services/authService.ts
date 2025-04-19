@@ -3,6 +3,7 @@ import { RegisterDTO, LoginDTO, AuthResponse, ResetPasswordDTO } from '../types/
 import { DatabaseService } from './DatabaseService';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
+import { User } from '../models/User';
 
 export class AuthService {
     private databaseService: DatabaseService;
@@ -29,8 +30,11 @@ export class AuthService {
 
             if (existingUser) {
                 return {
-                    user: null,
-                    session: null,
+                    user: {},
+                    token: '',
+                    message: existingUser.email === data.email ? 
+                        'Bu email adresi zaten kullanımda' : 
+                        'Bu kullanıcı adı zaten kullanımda',
                     error: existingUser.email === data.email ? 
                         'Bu email adresi zaten kullanımda' : 
                         'Bu kullanıcı adı zaten kullanımda'
@@ -43,7 +47,7 @@ export class AuthService {
                 password: data.password,
                 options: {
                     data: {
-                        name: data.name,
+                        first_name: data.first_name,
                         username: data.username || data.email.split('@')[0]
                     }
                 }
@@ -75,7 +79,7 @@ export class AuthService {
                         username: data.username || data.email.split('@')[0],
                         email: data.email,
                         password: hashedPassword, // Hash'lenmiş şifreyi kaydet
-                        first_name: data.name || '',
+                        first_name: data.first_name || '',
                         last_name: '',
                         phone: '',
                         profile_picture: '',
@@ -97,7 +101,7 @@ export class AuthService {
             const { data: profile, error: profileError } = await this.databaseService.createProfile(
                 authData.user.id,
                 {
-                    full_name: data.name,
+                    full_name: data.first_name + ' ' + data.last_name,
                 }
             );
 
@@ -108,20 +112,27 @@ export class AuthService {
             }
 
             return {
-                user: authData.user,
-                session: authData.session
+                user: {
+                    id: authData.user?.id ? BigInt(authData.user.id) : undefined,
+                    email: authData.user?.email,
+                    username: authData.user?.user_metadata?.username,
+                    role: authData.user?.user_metadata?.role
+                } as Partial<User>,
+                token: authData.session?.access_token || '',
+                message: 'Kullanıcı kaydı başarılı'
             };
         } catch (error: any) {
             console.error('Registration process error:', error);
             return {
-                user: null,
-                session: null,
+                user: {},
+                token: '',
+                message: 'Kullanıcı kaydı başarısız',
                 error: error.message
             };
         }
     }
 
-    async login(username: string, password: string): Promise<{ user: any; session: any; error?: string }> {
+    async login(username: string, password: string): Promise<AuthResponse> {
         try {
             console.log('Login attempt for:', username);
             
@@ -147,8 +158,9 @@ export class AuthService {
                 
                 if (!dbUser) {
                     return {
-                        user: null,
-                        session: null,
+                        user: {},
+                        token: '',
+                        message: 'Kullanıcı bulunamadı',
                         error: 'Kullanıcı bulunamadı'
                     };
                 }
@@ -156,8 +168,9 @@ export class AuthService {
                 // Kullanıcı rolünü kontrol et - Sadece admin veya superadmin giriş yapabilir
                 if (dbUser.role !== 'admin' && dbUser.role !== 'superadmin') {
                     return {
-                        user: null,
-                        session: null,
+                        user: {},
+                        token: '',
+                        message: 'Bu hesaba erişim yetkiniz bulunmamaktadır',
                         error: 'Bu hesaba erişim yetkiniz bulunmamaktadır. Sadece yöneticiler giriş yapabilir.'
                     };
                 }
@@ -169,8 +182,9 @@ export class AuthService {
                     const passwordMatch = await bcrypt.compare(password, dbUser.password);
                     if (!passwordMatch) {
                         return {
-                            user: null,
-                            session: null,
+                            user: {},
+                            token: '',
+                            message: 'Hatalı şifre',
                             error: 'Hatalı şifre'
                         };
                     }
@@ -190,8 +204,9 @@ export class AuthService {
                 console.error('Login error:', error);
                 if (error.message === 'Email not confirmed') {
                     return {
-                        user: null,
-                        session: null,
+                        user: {},
+                        token: '',
+                        message: 'Email adresinizi doğrulamanız gerekmektedir',
                         error: 'Email adresinizi doğrulamanız gerekmektedir. Lütfen email kutunuzu kontrol edin.'
                     };
                 }
@@ -202,8 +217,9 @@ export class AuthService {
                     // Role kontrolü tekrar - Sadece admin veya superadmin
                     if (dbUser.role !== 'admin' && dbUser.role !== 'superadmin') {
                         return {
-                            user: null,
-                            session: null,
+                            user: {},
+                            token: '',
+                            message: 'Bu hesaba erişim yetkiniz bulunmamaktadır',
                             error: 'Bu hesaba erişim yetkiniz bulunmamaktadır. Sadece yöneticiler giriş yapabilir.'
                         };
                     }
@@ -212,19 +228,13 @@ export class AuthService {
                     // NOT: Bu basitleştirilmiş bir yaklaşımdır, ideal olarak JWT token oluşturmanız gerekebilir
                     return {
                         user: {
-                            id: dbUser.id.toString(),
+                            id: dbUser.id,
                             email: dbUser.email,
-                            user_metadata: {
-                                name: dbUser.first_name,
-                                username: dbUser.username,
-                                role: dbUser.role
-                            }
-                        },
-                        session: {
-                            // Basit bir oturum objesi
-                            user: { id: dbUser.id.toString() },
-                            expires_at: Date.now() + 24 * 60 * 60 * 1000 // 1 gün
-                        }
+                            username: dbUser.username,
+                            role: dbUser.role
+                        } as unknown as Partial<User>,
+                        token: 'MANUAL_AUTH_TOKEN_' + Date.now(),
+                        message: 'Manuel giriş başarılı'
                     };
                 }
                 
@@ -241,21 +251,29 @@ export class AuthService {
                 await supabase.auth.signOut();
                 
                 return {
-                    user: null,
-                    session: null,
+                    user: {},
+                    token: '',
+                    message: 'Bu hesaba erişim yetkiniz bulunmamaktadır',
                     error: 'Bu hesaba erişim yetkiniz bulunmamaktadır. Sadece yöneticiler giriş yapabilir.'
                 };
             }
 
             return {
-                user: data.user,
-                session: data.session
+                user: {
+                    id: data.user?.id ? BigInt(data.user.id) : undefined,
+                    email: data.user?.email,
+                    username: data.user?.user_metadata?.username,
+                    role: data.user?.user_metadata?.role
+                } as Partial<User>,
+                token: data.session?.access_token || '',
+                message: 'Giriş başarılı'
             };
         } catch (error: any) {
             console.error('Login process error:', error);
             return {
-                user: null,
-                session: null,
+                user: {},
+                token: '',
+                message: 'Login process error',
                 error: error.message
             };
         }
@@ -340,8 +358,11 @@ export class AuthService {
 
             if (existingUser) {
                 return {
-                    user: null,
-                    session: null,
+                    user: {},
+                    token: '',
+                    message: existingUser.email === data.email ? 
+                        'Bu email adresi zaten kullanımda' : 
+                        'Bu kullanıcı adı zaten kullanımda',
                     error: existingUser.email === data.email ? 
                         'Bu email adresi zaten kullanımda' : 
                         'Bu kullanıcı adı zaten kullanımda'
@@ -354,7 +375,7 @@ export class AuthService {
                 password: data.password,
                 options: {
                     data: {
-                        name: data.name,
+                        first_name: data.first_name,
                         username: data.username || data.email.split('@')[0],
                         role: role
                     }
@@ -388,7 +409,7 @@ export class AuthService {
                         username: data.username || data.email.split('@')[0],
                         email: data.email,
                         password: hashedPassword, // Hash'lenmiş şifreyi kaydet
-                        first_name: data.name || '',
+                        first_name: data.first_name || '',
                         last_name: '',
                         phone: '',
                         profile_picture: '',
@@ -410,7 +431,7 @@ export class AuthService {
             const { data: profile, error: profileError } = await this.databaseService.createProfile(
                 authData.user.id,
                 {
-                    full_name: data.name,
+                    full_name: data.first_name + ' ' + data.last_name,
                 }
             );
 
@@ -421,14 +442,21 @@ export class AuthService {
             }
 
             return {
-                user: authData.user,
-                session: authData.session
+                user: {
+                    id: authData.user?.id ? BigInt(authData.user.id) : undefined,
+                    email: authData.user?.email,
+                    username: authData.user?.user_metadata?.username,
+                    role: authData.user?.user_metadata?.role
+                } as Partial<User>,
+                token: authData.session?.access_token || '',
+                message: 'Admin kaydı başarılı'
             };
         } catch (error: any) {
             console.error('Admin registration process error:', error);
             return {
-                user: null,
-                session: null,
+                user: {},
+                token: '',
+                message: 'Admin registration process error',
                 error: error.message
             };
         }
