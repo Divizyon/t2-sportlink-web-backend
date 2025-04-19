@@ -80,6 +80,7 @@ export const restrictTo = (...roles: string[]) => {
           message: 'Bu işlemi gerçekleştirmek için giriş yapmalısınız.'
         });
       }
+      
 
       // Get user role from the database
       const { data, error } = await supabase
