@@ -44,10 +44,15 @@ export const register = async (req: Request, res: Response): Promise<Response> =
 
 export const login = async (req: Request, res: Response): Promise<Response> => {
     try {
-        const { email, password }: LoginDTO = req.body;
+        const { email, username, password }: LoginDTO = req.body;
+        const loginIdentifier = email || username;
         
-        // Find user by email
-        const user = await findUserByEmail(email);
+        if (!loginIdentifier) {
+            return res.status(400).json({ error: 'Email veya kullanıcı adı gereklidir' });
+        }
+        
+        // Find user by email or username
+        const user = await findUserByEmail(loginIdentifier);
         if (!user) {
             return res.status(401).json({ error: 'Geçersiz kimlik bilgileri' });
         }

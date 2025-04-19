@@ -1,6 +1,7 @@
 import { supabase, supabaseAdmin } from '../config/supabase';
 import { RegisterDTO, LoginDTO, AuthResponse, ResetPasswordDTO } from '../types/auth.types';
 import { DatabaseService } from './DatabaseService';
+import { User } from '../models/User';
 
 export class AuthService {
     private databaseService: DatabaseService;
@@ -17,8 +18,9 @@ export class AuthService {
             const { data: existingUser } = await supabase.auth.getUser();
             if (existingUser?.user) {
                 return {
-                    user: null,
-                    session: null,
+                    user: {} as Partial<User>,
+                    token: '',
+                    message: 'User already exists',
                     error: 'User already exists'
                 };
             }
@@ -29,7 +31,8 @@ export class AuthService {
                 password: data.password,
                 options: {
                     data: {
-                        name: data.name
+                        first_name: data.first_name,
+                        last_name: data.last_name
                     }
                 }
             });
@@ -54,7 +57,7 @@ export class AuthService {
             const { data: profile, error: profileError } = await this.databaseService.createProfile(
                 authData.user.id,
                 {
-                    full_name: data.name
+                    full_name: data.first_name + ' ' + data.last_name
                 }
             );
 
@@ -66,20 +69,27 @@ export class AuthService {
             }
 
             return {
-                user: authData.user,
-                session: authData.session
+                user: {
+                    id: authData.user?.id ? BigInt(authData.user.id) : undefined,
+                    email: authData.user?.email,
+                    username: authData.user?.user_metadata?.username,
+                    role: authData.user?.user_metadata?.role
+                } as Partial<User>,
+                token: authData.session?.access_token || '',
+                message: 'Kullanıcı kaydı başarılı'
             };
         } catch (error: any) {
             console.error('Registration process error:', error);
             return {
-                user: null,
-                session: null,
+                user: {} as Partial<User>,
+                token: '',
+                message: 'Kullanıcı kaydı başarısız',
                 error: error.message
             };
         }
     }
 
-    async login(email: string, password: string): Promise<{ user: any; session: any; error?: string }> {
+    async login(email: string, password: string): Promise<AuthResponse> {
         try {
             console.log('Login attempt for:', email);
             const { data, error } = await supabase.auth.signInWithPassword({
@@ -126,8 +136,14 @@ export class AuthService {
                     }
 
                     return {
-                        user: newAuthData.user,
-                        session: newAuthData.session
+                        user: {
+                            id: newAuthData.user?.id ? BigInt(newAuthData.user.id) : undefined,
+                            email: newAuthData.user?.email,
+                            username: newAuthData.user?.user_metadata?.username,
+                            role: newAuthData.user?.user_metadata?.role
+                        } as Partial<User>,
+                        token: newAuthData.session?.access_token || '',
+                        message: 'Giriş başarılı'
                     };
                 } catch (adminError: any) {
                     console.error('Admin operation error:', adminError);
@@ -145,12 +161,23 @@ export class AuthService {
             }
 
             return {
-                user: data.user,
-                session: data.session
+                user: {
+                    id: data.user?.id ? BigInt(data.user.id) : undefined,
+                    email: data.user?.email,
+                    username: data.user?.user_metadata?.username,
+                    role: data.user?.user_metadata?.role
+                } as Partial<User>,
+                token: data.session?.access_token || '',
+                message: 'Giriş başarılı'
             };
         } catch (error: any) {
             console.error('Login process error:', error);
-            return { user: null, session: null, error: error.message };
+            return { 
+                user: {} as Partial<User>, 
+                token: '', 
+                message: 'Giriş başarısız',
+                error: error.message 
+            };
         }
     }
 

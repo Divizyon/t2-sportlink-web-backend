@@ -24,7 +24,7 @@ export const getAllUsers = async (req: Request, res: Response) => {
 export const getUserById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const user = await userService.findUserById(id);
+    const user = await userService.findUserById(BigInt(id));
     
     if (!user) {
       return res.status(404).json({
