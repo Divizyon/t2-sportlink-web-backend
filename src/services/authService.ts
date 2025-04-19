@@ -54,7 +54,8 @@ export class AuthService {
                     data: {
                         first_name: data.first_name,
                         last_name: data.last_name,
-                        username: data.username || data.email.split('@')[0]
+                        username: data.username || data.email.split('@')[0],
+                        role: 'user' // Kullanıcı rolü her zaman 'user' olarak ayarlanır
                     },
                     emailRedirectTo: `${process.env.FRONTEND_URL}/email-confirmed`
                 }
@@ -88,7 +89,7 @@ export class AuthService {
                         profile_picture: data.profile_picture || '',
                         default_location_latitude: data.default_location_latitude || 0,
                         default_location_longitude: data.default_location_longitude || 0,
-                        role: data.role || 'user'
+                        role: 'user' // Her zaman 'user' rolü verilir
                     }
                 });
                 console.log('User created in database:', newUser);
@@ -307,9 +308,21 @@ export class AuthService {
         }
     }
 
-    async registerAdmin(data: RegisterDTO, role: 'admin' | 'superadmin' = 'admin'): Promise<AuthResponse> {
+    /**
+     * Yeni admin kullanıcı oluşturur (sadece superadmin tarafından çağrılabilir)
+     * 
+     * Not: SuperAdmin oluşturmak için veritabanına doğrudan SQL sorgusu çalıştırılmalıdır:
+     * 
+     * -- Önce normal bir kullanıcı oluşturun (register endpoint'i ile)
+     * -- Sonra aşağıdaki SQL sorgusu ile kullanıcıyı superadmin yapın:
+     * UPDATE "public"."Users" SET role = 'superadmin' WHERE email = 'super@example.com';
+     * 
+     * -- Veya ID ile:
+     * UPDATE "public"."Users" SET role = 'superadmin' WHERE id = 1;
+     */
+    async registerAdmin(data: RegisterDTO): Promise<AuthResponse> {
         try {
-            console.log(`Starting ${role} registration process for:`, data.email);
+            console.log(`Starting admin registration process for:`, data.email);
 
             // Email ile kullanıcı var mı kontrol et
             const existingUser = await this.prisma.users.findFirst({
@@ -334,6 +347,10 @@ export class AuthService {
                 };
             }
 
+            // Şifreyi hash'le
+            const saltRounds = 10;
+            const hashedPassword = await bcrypt.hash(data.password, saltRounds);
+
             // Kullanıcı kaydı
             const { data: authData, error } = await supabase.auth.signUp({
                 email: data.email,
@@ -341,17 +358,18 @@ export class AuthService {
                 options: {
                     data: {
                         first_name: data.first_name,
+                        last_name: data.last_name,
                         username: data.username || data.email.split('@')[0],
-                        role: role
-                    }
+                        role: 'admin' // Admin rolü
+                    },
+                    emailRedirectTo: `${process.env.FRONTEND_URL}/email-confirmed`
                 }
             });
 
             console.log('Admin registration response:', {
                 success: !!authData?.user,
                 error: error?.message,
-                userId: authData?.user?.id,
-                role: role
+                userId: authData?.user?.id
             });
 
             if (error) {
@@ -363,10 +381,6 @@ export class AuthService {
                 throw new Error('No user data returned');
             }
 
-            // Şifreyi hash'le
-            const saltRounds = 10;
-            const hashedPassword = await bcrypt.hash(data.password, saltRounds);
-
             // Users tablosuna admin olarak kayıt
             try {
                 const newUser = await this.prisma.users.create({
@@ -375,47 +389,34 @@ export class AuthService {
                         email: data.email,
                         password: hashedPassword, // Hash'lenmiş şifreyi kaydet
                         first_name: data.first_name || '',
-                        last_name: '',
-                        phone: '',
-                        profile_picture: '',
-                        default_location_latitude: 0,
-                        default_location_longitude: 0,
-                        role: role // admin veya superadmin olarak kaydet
+                        last_name: data.last_name || '',
+                        phone: data.phone || '',
+                        profile_picture: data.profile_picture || '',
+                        default_location_latitude: data.default_location_latitude || 0,
+                        default_location_longitude: data.default_location_longitude || 0,
+                        role: 'admin' // Admin rolü
                     }
                 });
-                console.log(`${role.toUpperCase()} user created in database:`, newUser);
+                console.log(`ADMIN user created in database:`, newUser);
+                
+                return {
+                    user: {
+                        id: newUser.id,
+                        email: newUser.email,
+                        username: newUser.username,
+                        first_name: newUser.first_name,
+                        last_name: newUser.last_name,
+                        role: newUser.role
+                    } as Partial<User>,
+                    token: '', // Email onaylanana kadar token vermiyoruz
+                    message: 'Admin kullanıcı kaydı başarılı. Email adresine gönderilen link ile hesabın onaylanması gerekmektedir.'
+                };
             } catch (dbError) {
                 console.error('Database error:', dbError);
                 // Veritabanı hatası durumunda Supabase kaydını da sil
-                await supabase.auth.admin.deleteUser(authData.user.id);
+                await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
                 throw new Error('Veritabanı kaydı oluşturulamadı');
             }
-
-            // Profil oluştur
-            console.log(`Creating profile for ${role}:`, authData.user.id);
-            const { data: profile, error: profileError } = await this.databaseService.createProfile(
-                authData.user.id,
-                {
-                    full_name: data.first_name + ' ' + data.last_name,
-                }
-            );
-
-            if (profileError) {
-                console.error('Profile creation error:', profileError);
-            } else {
-                console.log('Profile created successfully:', profile);
-            }
-
-            return {
-                user: {
-                    id: authData.user?.id ? BigInt(authData.user.id) : undefined,
-                    email: authData.user?.email,
-                    username: authData.user?.user_metadata?.username,
-                    role: authData.user?.user_metadata?.role
-                } as Partial<User>,
-                token: authData.session?.access_token || '',
-                message: 'Admin kaydı başarılı'
-            };
         } catch (error: any) {
             console.error('Admin registration process error:', error);
             return {
