@@ -1,211 +1,297 @@
-import { supabase } from '../config/supabase';
+import { PrismaClient } from '@prisma/client';
+import { Announcement, CreateAnnouncementDTO, UpdateAnnouncementDTO, formatAnnouncementResponse } from '../models/Announcement';
 import { generateSlug } from '../utils/stringUtils';
+import { User } from '../models/User';
 
-interface Announcement {
-    id: string;
-    title: string;
-    slug: string;
-    content: string;
-    published: boolean;
-    start_date: string | null;
-    end_date: string | null;
-    created_at: string;
-    updated_at: string | null;
-}
+const prisma = new PrismaClient();
 
 export class AnnouncementService {
     /**
-     * Creates a new announcement
+     * Yeni bir duyuru oluşturur
      * 
-     * @param data Announcement data
-     * @returns The created announcement or error
+     * @param data Duyuru verileri
+     * @returns Oluşturulan duyuru veya hata
      */
-    async createAnnouncement(data: Partial<Announcement>): Promise<{ data: Announcement | null; error: any }> {
+    async createAnnouncement(data: CreateAnnouncementDTO): Promise<{ data: Announcement | null; error: any }> {
         try {
-            // Generate slug from title
-            const slug = generateSlug(data.title || '');
+            // Slug oluştur
+            const slug = generateSlug(data.title);
 
-            const { data: announcement, error } = await supabase
-                .from('announcements')
-                .insert([
-                    {
-                        ...data,
-                        slug,
-                        created_at: new Date().toISOString()
-                    }
-                ])
-                .select()
-                .single();
+            // Tarihleri işle
+            const startDate = data.startDate ? new Date(data.startDate) : null;
+            const endDate = data.endDate ? new Date(data.endDate) : null;
 
-            if (error) throw error;
-
-            return { data: announcement, error: null };
-        } catch (error: any) {
-            console.error('Error creating announcement:', error);
-            return { data: null, error: error.message };
-        }
-    }
-
-    /**
-     * Updates an existing announcement
-     * 
-     * @param id Announcement ID
-     * @param data Updated announcement data
-     * @returns The updated announcement or error
-     */
-    async updateAnnouncement(id: string, data: Partial<Announcement>): Promise<{ data: Announcement | null; error: any }> {
-        try {
-            const updateData: any = { ...data, updated_at: new Date().toISOString() };
-
-            // Generate new slug if title changed
-            if (data.title) {
-                updateData.slug = generateSlug(data.title);
+            // Creator ID'yi işle
+            let creatorId: bigint | null = null;
+            if (data.creatorId) {
+                creatorId = typeof data.creatorId === 'string' 
+                    ? BigInt(data.creatorId) 
+                    : data.creatorId;
             }
 
-            const { data: announcement, error } = await supabase
-                .from('announcements')
-                .update(updateData)
-                .eq('id', id)
-                .select()
-                .single();
+            console.log('createAnnouncement - received published value:', data.published);
 
-            if (error) throw error;
+            // Duyuruyu oluştur - creator nesnesini include etme, sadece ID'yi kaydet
+            const announcement = await prisma.announcements.create({
+                data: {
+                    title: data.title,
+                    slug,
+                    content: data.content,
+                    published: typeof data.published === 'string' 
+                        ? data.published === 'true' 
+                        : Boolean(data.published || false),
+                    start_date: startDate,
+                    end_date: endDate,
+                    creator_id: creatorId
+                }
+            });
 
-            return { data: announcement, error: null };
+            console.log('Created announcement with published:', announcement.published);
+
+            return { data: announcement as Announcement, error: null };
         } catch (error: any) {
-            console.error('Error updating announcement:', error);
+            console.error('Duyuru oluşturma hatası:', error);
             return { data: null, error: error.message };
         }
     }
 
     /**
-     * Deletes an announcement
+     * Var olan bir duyuruyu günceller
      * 
-     * @param id Announcement ID
-     * @returns Success status or error
+     * @param id Duyuru ID
+     * @param data Güncellenecek veriler
+     * @returns Güncellenen duyuru veya hata
      */
-    async deleteAnnouncement(id: string): Promise<{ success: boolean; error: any }> {
+    async updateAnnouncement(
+        id: string | bigint,
+        data: UpdateAnnouncementDTO
+    ): Promise<{ data: Announcement | null; error: any }> {
         try {
-            const { error } = await supabase
-                .from('announcements')
-                .delete()
-                .eq('id', id);
+            // ID'yi BigInt'e dönüştür
+            const announcementId = typeof id === 'string' ? BigInt(id) : id;
 
-            if (error) throw error;
+            // Duyurunun var olup olmadığını kontrol et
+            const existingAnnouncement = await prisma.announcements.findUnique({
+                where: { id: announcementId }
+            });
+
+            if (!existingAnnouncement) {
+                return { data: null, error: 'Duyuru bulunamadı' };
+            }
+
+            console.log('updateAnnouncement - Existing announcement published:', existingAnnouncement.published);
+            console.log('updateAnnouncement - Update published value:', data.published);
+
+            // Güncelleme verilerini hazırla
+            const updateData: any = {};
+            
+            // İçerik
+            if (data.content !== undefined) {
+                updateData.content = data.content;
+            }
+            
+            // Yayın durumu
+            if (data.published !== undefined) {
+                // String olarak gelmiş olabilir, boolean'a dönüştür
+                updateData.published = typeof data.published === 'string' 
+                    ? data.published === 'true' 
+                    : Boolean(data.published);
+            }
+            
+            // Başlık ve slug
+            if (data.title) {
+                updateData.title = data.title;
+                updateData.slug = generateSlug(data.title);
+            }
+            
+            // Tarihler
+            if (data.startDate !== undefined) {
+                updateData.start_date = data.startDate ? new Date(data.startDate) : null;
+            }
+            
+            if (data.endDate !== undefined) {
+                updateData.end_date = data.endDate ? new Date(data.endDate) : null;
+            }
+            
+            // Her zaman güncelleme tarihini ekle
+            updateData.updated_at = new Date();
+
+            console.log('updateAnnouncement - Final update data:', updateData);
+
+            // Duyuruyu güncelle - creator bilgisini include etme
+            const updatedAnnouncement = await prisma.announcements.update({
+                where: { id: announcementId },
+                data: updateData
+            });
+
+            console.log('updateAnnouncement - Updated announcement published:', updatedAnnouncement.published);
+
+            return { data: updatedAnnouncement as Announcement, error: null };
+        } catch (error: any) {
+            console.error('Duyuru güncelleme hatası:', error);
+            return { data: null, error: error.message };
+        }
+    }
+
+    /**
+     * Bir duyuruyu siler
+     * 
+     * @param id Duyuru ID
+     * @returns Başarı durumu veya hata
+     */
+    async deleteAnnouncement(id: string | bigint): Promise<{ success: boolean; error: any }> {
+        try {
+            // ID'yi BigInt'e dönüştür
+            const announcementId = typeof id === 'string' ? BigInt(id) : id;
+
+            // Duyurunun var olup olmadığını kontrol et
+            const existingAnnouncement = await prisma.announcements.findUnique({
+                where: { id: announcementId }
+            });
+
+            if (!existingAnnouncement) {
+                return { success: false, error: 'Duyuru bulunamadı' };
+            }
+
+            // Duyuruyu sil
+            await prisma.announcements.delete({
+                where: { id: announcementId }
+            });
 
             return { success: true, error: null };
         } catch (error: any) {
-            console.error('Error deleting announcement:', error);
+            console.error('Duyuru silme hatası:', error);
             return { success: false, error: error.message };
         }
     }
 
     /**
-     * Finds an announcement by ID
+     * ID'ye göre duyuru bulur
      * 
-     * @param id Announcement ID
-     * @returns The announcement or null if not found
+     * @param id Duyuru ID
+     * @returns Bulunan duyuru veya hata
      */
-    async findAnnouncementById(id: string): Promise<{ data: Announcement | null; error: any }> {
+    async findAnnouncementById(id: string | bigint): Promise<{ data: Announcement | null; error: any }> {
         try {
-            const { data: announcement, error } = await supabase
-                .from('announcements')
-                .select('*')
-                .eq('id', id)
-                .single();
+            // ID'yi BigInt'e dönüştür
+            const announcementId = typeof id === 'string' ? BigInt(id) : id;
 
-            if (error && error.code !== 'PGRST116') throw error;
+            const announcement = await prisma.announcements.findUnique({
+                where: { id: announcementId }
+            });
 
-            return { data: announcement, error: null };
+            if (!announcement) {
+                return { data: null, error: null };
+            }
+
+            return { data: announcement as Announcement, error: null };
         } catch (error: any) {
-            console.error('Error finding announcement:', error);
+            console.error('Duyuru bulma hatası:', error);
             return { data: null, error: error.message };
         }
     }
 
     /**
-     * Finds an announcement by slug
+     * Slug'a göre duyuru bulur
      * 
-     * @param slug Announcement slug
-     * @returns The announcement or null if not found
+     * @param slug Duyuru slug
+     * @returns Bulunan duyuru veya hata
      */
     async findAnnouncementBySlug(slug: string): Promise<{ data: Announcement | null; error: any }> {
         try {
-            const { data: announcement, error } = await supabase
-                .from('announcements')
-                .select('*')
-                .eq('slug', slug)
-                .single();
+            const announcement = await prisma.announcements.findUnique({
+                where: { slug }
+            });
 
-            if (error && error.code !== 'PGRST116') throw error;
+            if (!announcement) {
+                return { data: null, error: null };
+            }
 
-            return { data: announcement, error: null };
+            return { data: announcement as Announcement, error: null };
         } catch (error: any) {
-            console.error('Error finding announcement by slug:', error);
+            console.error('Slug ile duyuru bulma hatası:', error);
             return { data: null, error: error.message };
         }
     }
 
     /**
-     * Lists announcements with pagination
+     * Duyuruları sayfalı olarak listeler
      * 
-     * @param page Page number
-     * @param limit Items per page
-     * @param isPublishedOnly Filter for published announcements only
-     * @returns List of announcements and total count
+     * @param page Sayfa numarası
+     * @param limit Sayfa başı öğe sayısı
+     * @param isPublishedOnly Sadece yayınlanmış olanları getir
+     * @returns Duyuru listesi ve toplam sayı
      */
-    async listAnnouncements(page: number = 1, limit: number = 10, isPublishedOnly: boolean = false): Promise<{ data: Announcement[]; count: number; error: any }> {
+    async listAnnouncements(
+        page: number = 1,
+        limit: number = 10,
+        isPublishedOnly: boolean = false
+    ): Promise<{ data: Announcement[]; count: number; error: any }> {
         try {
-            const offset = (page - 1) * limit;
+            const skip = (page - 1) * limit;
 
-            let query = supabase
-                .from('announcements')
-                .select('*', { count: 'exact' });
-
+            // Filtreleme koşulları
+            const where: any = {};
             if (isPublishedOnly) {
-                query = query.eq('published', true);
+                where.published = true;
             }
 
-            const { data: announcements, count, error } = await query
-                .order('created_at', { ascending: false })
-                .range(offset, offset + limit - 1);
+            // Toplam sayı
+            const count = await prisma.announcements.count({ where });
 
-            if (error) throw error;
+            // Duyuruları getir - creator bilgisini include etme
+            const announcements = await prisma.announcements.findMany({
+                where,
+                orderBy: { created_at: 'desc' },
+                skip,
+                take: limit
+            });
 
             return {
                 data: announcements as Announcement[],
-                count: count || 0,
+                count,
                 error: null
             };
         } catch (error: any) {
-            console.error('Error listing announcements:', error);
+            console.error('Duyuru listeleme hatası:', error);
             return { data: [], count: 0, error: error.message };
         }
     }
 
     /**
-     * Gets currently active announcements
-     * (published and within date range if dates are specified)
+     * Aktif duyuruları getirir
+     * (yayında ve tarih aralığında olanlar)
      * 
-     * @returns List of active announcements
+     * @returns Aktif duyuru listesi
      */
     async getActiveAnnouncements(): Promise<{ data: Announcement[]; error: any }> {
         try {
-            const now = new Date().toISOString();
+            const now = new Date();
 
-            const { data: announcements, error } = await supabase
-                .from('announcements')
-                .select('*')
-                .eq('published', true)
-                .or(`start_date.is.null,start_date.lte.${now}`)
-                .or(`end_date.is.null,end_date.gte.${now}`)
-                .order('created_at', { ascending: false });
-
-            if (error) throw error;
+            const announcements = await prisma.announcements.findMany({
+                where: {
+                    published: true,
+                    AND: [
+                        {
+                            OR: [
+                                { start_date: null },
+                                { start_date: { lte: now } }
+                            ]
+                        },
+                        {
+                            OR: [
+                                { end_date: null },
+                                { end_date: { gte: now } }
+                            ]
+                        }
+                    ]
+                },
+                orderBy: { created_at: 'desc' }
+            });
 
             return { data: announcements as Announcement[], error: null };
         } catch (error: any) {
-            console.error('Error getting active announcements:', error);
+            console.error('Aktif duyuru getirme hatası:', error);
             return { data: [], error: error.message };
         }
     }

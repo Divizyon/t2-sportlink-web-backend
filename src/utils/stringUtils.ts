@@ -11,16 +11,25 @@
  * @returns Generated slug
  */
 export function generateSlug(text: string): string {
-    return text
+    const slug = text
         .toString()
         .toLowerCase()
         .trim()
         .replace(/\s+/g, '-')        // Replace spaces with hyphens
-        .replace(/&/g, '-and-')      // Replace & with 'and'
+        .replace(/ğ/g, 'g')          // Replace Turkish characters
+        .replace(/ü/g, 'u')
+        .replace(/ş/g, 's')
+        .replace(/ı/g, 'i')
+        .replace(/ö/g, 'o')
+        .replace(/ç/g, 'c')
         .replace(/[^\w\-]+/g, '')    // Remove all non-word characters
         .replace(/\-\-+/g, '-')      // Replace multiple hyphens with single hyphen
         .replace(/^-+/, '')          // Trim hyphens from start
         .replace(/-+$/, '');         // Trim hyphens from end
+
+    // Rastgele bir ID ekleyerek benzersiz yap
+    const randomId = Math.random().toString(36).substring(2, 6);
+    return `${slug}-${randomId}`;
 }
 
 /**

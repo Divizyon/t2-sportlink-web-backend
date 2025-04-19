@@ -3,7 +3,6 @@ import { AnnouncementController } from '../controllers/AnnouncementController';
 import { body } from 'express-validator';
 import { validateRequest } from '../middleware/validateRequest';
 import { protect, adminOnly } from '../middleware/authMiddleware';
-import { authorize } from '../middleware/adminAuthMiddleware';
 
 const router = Router();
 const announcementController = new AnnouncementController();
@@ -31,14 +30,12 @@ const announcementController = new AnnouncementController();
  *                 type: string
  *               content:
  *                 type: string
- *               isImportant:
- *                 type: boolean
  *               isPublished:
  *                 type: boolean
- *               publishedAt:
+ *               startDate:
  *                 type: string
  *                 format: date-time
- *               expiresAt:
+ *               endDate:
  *                 type: string
  *                 format: date-time
  *     responses:
@@ -56,10 +53,9 @@ router.post(
     [
         body('title').notEmpty().withMessage('Başlık gereklidir'),
         body('content').notEmpty().withMessage('İçerik gereklidir'),
-        body('isImportant').optional().isBoolean().withMessage('isImportant boolean olmalıdır'),
         body('isPublished').optional().isBoolean().withMessage('isPublished boolean olmalıdır'),
-        body('publishedAt').optional().isISO8601().withMessage('Geçerli bir tarih formatı kullanınız'),
-        body('expiresAt').optional().isISO8601().withMessage('Geçerli bir tarih formatı kullanınız'),
+        body('startDate').optional().isISO8601().withMessage('Geçerli bir tarih formatı kullanınız'),
+        body('endDate').optional().isISO8601().withMessage('Geçerli bir tarih formatı kullanınız'),
         validateRequest
     ],
     announcementController.createAnnouncement
@@ -92,14 +88,12 @@ router.post(
  *                 type: string
  *               content:
  *                 type: string
- *               isImportant:
- *                 type: boolean
  *               isPublished:
  *                 type: boolean
- *               publishedAt:
+ *               startDate:
  *                 type: string
  *                 format: date-time
- *               expiresAt:
+ *               endDate:
  *                 type: string
  *                 format: date-time
  *     responses:
@@ -115,13 +109,13 @@ router.post(
 router.put(
     '/:id',
     protect,
+    adminOnly,
     [
         body('title').optional(),
         body('content').optional(),
-        body('isImportant').optional().isBoolean().withMessage('isImportant boolean olmalıdır'),
         body('isPublished').optional().isBoolean().withMessage('isPublished boolean olmalıdır'),
-        body('publishedAt').optional().isISO8601().withMessage('Geçerli bir tarih formatı kullanınız'),
-        body('expiresAt').optional().isISO8601().withMessage('Geçerli bir tarih formatı kullanınız'),
+        body('startDate').optional().isISO8601().withMessage('Geçerli bir tarih formatı kullanınız'),
+        body('endDate').optional().isISO8601().withMessage('Geçerli bir tarih formatı kullanınız'),
         validateRequest
     ],
     announcementController.updateAnnouncement
@@ -151,7 +145,7 @@ router.put(
  *       404:
  *         description: Announcement not found
  */
-router.delete('/:id', protect, announcementController.deleteAnnouncement);
+router.delete('/:id', protect, adminOnly, announcementController.deleteAnnouncement);
 
 /**
  * @swagger
@@ -177,6 +171,28 @@ router.get('/:id', announcementController.getAnnouncementById);
 
 /**
  * @swagger
+ * /api/announcements/slug/{slug}:
+ *   get:
+ *     tags:
+ *       - Announcements
+ *     summary: Get an announcement by slug
+ *     parameters:
+ *       - in: path
+ *         name: slug
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Announcement slug
+ *     responses:
+ *       200:
+ *         description: Announcement retrieved successfully
+ *       404:
+ *         description: Announcement not found
+ */
+router.get('/slug/:slug', announcementController.getAnnouncementBySlug);
+
+/**
+ * @swagger
  * /api/announcements:
  *   get:
  *     tags:
@@ -193,6 +209,11 @@ router.get('/:id', announcementController.getAnnouncementById);
  *         schema:
  *           type: integer
  *         description: Page size
+ *       - in: query
+ *         name: published
+ *         schema:
+ *           type: boolean
+ *         description: Filter for published only
  *     responses:
  *       200:
  *         description: List of announcements
@@ -211,8 +232,5 @@ router.get('/', announcementController.listAnnouncements);
  *         description: List of active announcements
  */
 router.get('/active', announcementController.getActiveAnnouncements);
-
-// Public routes
-router.get('/slug/:slug', announcementController.getAnnouncementBySlug);
 
 export default router; 

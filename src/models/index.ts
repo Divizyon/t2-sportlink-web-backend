@@ -8,4 +8,5 @@ export * from './EventRating';
 export * from './Notification';
 export * from './Report';
 export * from './AdminLog';
-export * from './UserRating'; 
+export * from './UserRating';
+export * from './Announcement'; 

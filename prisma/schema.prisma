@@ -23,6 +23,7 @@ model Users {
   created_at                 DateTime             @default(now())
   updated_at                 DateTime             @updatedAt
   adminLogs                  Admin_Logs[]
+  announcements              Announcements[]
   eventParticipants          Event_Participants[]
   eventRatings               Event_Ratings[]
   createdEvents              Events[]             @relation("UserEvents")
@@ -157,4 +158,18 @@ model User_Ratings {
   created_at     DateTime @default(now())
   ratedUser      Users    @relation("RatedUser", fields: [rated_user_id], references: [id])
   ratingUser     Users    @relation("RatingUser", fields: [rating_user_id], references: [id])
+}
+
+model Announcements {
+  id         BigInt    @id @default(autoincrement())
+  title      String
+  slug       String    @unique
+  content    String
+  published  Boolean   @default(false)
+  start_date DateTime?
+  end_date   DateTime?
+  creator_id BigInt?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+  creator    Users?    @relation(fields: [creator_id], references: [id])
 }

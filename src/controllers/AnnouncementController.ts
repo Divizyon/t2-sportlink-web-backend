@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { AnnouncementService } from '../services/AnnouncementService';
+import { formatAnnouncementResponse } from '../models/Announcement';
 
 export class AnnouncementController {
     private announcementService: AnnouncementService;
@@ -9,267 +10,261 @@ export class AnnouncementController {
     }
 
     /**
-     * Create a new announcement
+     * Yeni bir duyuru oluşturur
      */
-    createAnnouncement = async (req: Request, res: Response): Promise<void> => {
+    createAnnouncement = async (req: Request, res: Response) => {
         try {
-            const { title, content, published, start_date, end_date } = req.body;
-
-            // Validate required fields
-            if (!title || !content) {
-                res.status(400).json({
-                    success: false,
-                    message: 'Title and content are required'
+            const { title, content, isPublished, startDate, endDate } = req.body;
+            
+            // Kullanıcı kimliğini token'dan al
+            const creatorId = req.user?.userId;
+            
+            if (!creatorId) {
+                return res.status(401).json({ 
+                    success: false, 
+                    error: 'Yetkilendirme hatası: Kullanıcı kimliği bulunamadı' 
                 });
-                return;
             }
 
-            // Create announcement
+            // isPublished parametresi ile published değerini belirle
+            let published = false;
+            if (isPublished !== undefined) {
+                published = typeof isPublished === 'string' ? isPublished === 'true' : Boolean(isPublished);
+            }
+
             const { data, error } = await this.announcementService.createAnnouncement({
                 title,
                 content,
-                published: published !== undefined ? published : false,
-                start_date: start_date || null,
-                end_date: end_date || null
-            });
-
-            if (error) {
-                res.status(400).json({ success: false, message: error });
-                return;
-            }
-
-            res.status(201).json({
-                success: true,
-                data
-            });
-        } catch (error: any) {
-            console.error('Error in createAnnouncement controller:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Internal server error',
-                error: error.message
-            });
-        }
-    }
-
-    /**
-     * Update an existing announcement
-     */
-    updateAnnouncement = async (req: Request, res: Response): Promise<void> => {
-        try {
-            const { id } = req.params;
-            const { title, content, published, start_date, end_date } = req.body;
-
-            // Check if the announcement exists
-            const checkResult = await this.announcementService.findAnnouncementById(id);
-            if (checkResult.error || !checkResult.data) {
-                res.status(404).json({
-                    success: false,
-                    message: 'Announcement not found'
-                });
-                return;
-            }
-
-            // Update announcement
-            const { data, error } = await this.announcementService.updateAnnouncement(id, {
-                title,
-                content,
                 published,
-                start_date,
-                end_date
+                startDate: startDate || null,
+                endDate: endDate || null,
+                creatorId: creatorId // Auth middleware'inden gelen kullanıcı ID'si
             });
 
             if (error) {
-                res.status(400).json({ success: false, message: error });
-                return;
+                return res.status(500).json({ success: false, error });
             }
 
-            res.status(200).json({
-                success: true,
-                data
+            return res.status(201).json({ 
+                success: true, 
+                data: data ? formatAnnouncementResponse(data) : null 
             });
         } catch (error: any) {
-            console.error('Error in updateAnnouncement controller:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Internal server error',
-                error: error.message
-            });
+            console.error('Duyuru oluşturma hatası:', error);
+            return res.status(500).json({ success: false, error: error.message });
         }
     }
 
     /**
-     * Delete an announcement
+     * Varolan bir duyuruyu günceller
      */
-    deleteAnnouncement = async (req: Request, res: Response): Promise<void> => {
+    updateAnnouncement = async (req: Request, res: Response) => {
         try {
             const { id } = req.params;
-
-            // Check if the announcement exists
-            const checkResult = await this.announcementService.findAnnouncementById(id);
-            if (checkResult.error || !checkResult.data) {
-                res.status(404).json({
-                    success: false,
-                    message: 'Announcement not found'
+            const { title, content, isPublished, startDate, endDate } = req.body;
+            
+            console.log('Güncellenecek değerler:', { isPublished });
+            
+            // Önce duyuruyu bulalım ve yetki kontrolü yapalım
+            const existingAnnouncement = await this.announcementService.findAnnouncementById(id);
+            
+            if (!existingAnnouncement.data) {
+                return res.status(404).json({ success: false, error: 'Duyuru bulunamadı' });
+            }
+            
+            // Admin değilse ve kendi oluşturmadığı bir duyuruysa güncelleme yetkisi yok
+            const isAdmin = req.user?.role === 'admin';
+            const isCreator = existingAnnouncement.data.creator_id?.toString() === req.user?.userId.toString();
+            
+            if (!isAdmin && !isCreator) {
+                return res.status(403).json({ 
+                    success: false, 
+                    error: 'Bu duyuruyu güncelleme yetkiniz bulunmamaktadır' 
                 });
-                return;
+            }
+            
+            // isPublished parametresi ile published değerini belirle
+            let published;
+            if (isPublished !== undefined) {
+                published = typeof isPublished === 'string' ? isPublished === 'true' : Boolean(isPublished);
+            }
+            
+            const { data, error } = await this.announcementService.updateAnnouncement(
+                id,
+                {
+                    title,
+                    content,
+                    published,
+                    startDate,
+                    endDate
+                }
+            );
+
+            if (error) {
+                if (error === 'Duyuru bulunamadı') {
+                    return res.status(404).json({ success: false, error });
+                }
+                return res.status(500).json({ success: false, error });
             }
 
-            // Delete announcement
+            return res.status(200).json({
+                success: true,
+                data: data ? formatAnnouncementResponse(data) : null
+            });
+        } catch (error: any) {
+            console.error('Duyuru güncelleme hatası:', error);
+            return res.status(500).json({ success: false, error: error.message });
+        }
+    }
+
+    /**
+     * Bir duyuruyu siler
+     */
+    deleteAnnouncement = async (req: Request, res: Response) => {
+        try {
+            const { id } = req.params;
+            
+            // Önce duyuruyu bulalım ve yetki kontrolü yapalım
+            const existingAnnouncement = await this.announcementService.findAnnouncementById(id);
+            
+            if (!existingAnnouncement.data) {
+                return res.status(404).json({ success: false, error: 'Duyuru bulunamadı' });
+            }
+            
+            // Admin değilse ve kendi oluşturmadığı bir duyuruysa silme yetkisi yok
+            const isAdmin = req.user?.role === 'admin';
+            const isCreator = existingAnnouncement.data.creator_id?.toString() === req.user?.userId.toString();
+            
+            if (!isAdmin && !isCreator) {
+                return res.status(403).json({ 
+                    success: false, 
+                    error: 'Bu duyuruyu silme yetkiniz bulunmamaktadır' 
+                });
+            }
+
             const { success, error } = await this.announcementService.deleteAnnouncement(id);
 
             if (error) {
-                res.status(400).json({ success: false, message: error });
-                return;
+                if (error === 'Duyuru bulunamadı') {
+                    return res.status(404).json({ success: false, error });
+                }
+                return res.status(500).json({ success: false, error });
             }
 
-            res.status(200).json({
-                success: true,
-                message: 'Announcement deleted successfully'
-            });
+            return res.status(200).json({ success: true, message: 'Duyuru başarıyla silindi' });
         } catch (error: any) {
-            console.error('Error in deleteAnnouncement controller:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Internal server error',
-                error: error.message
-            });
+            console.error('Duyuru silme hatası:', error);
+            return res.status(500).json({ success: false, error: error.message });
         }
     }
 
     /**
-     * Get a single announcement by ID
+     * ID'ye göre duyuru getirir
      */
-    getAnnouncementById = async (req: Request, res: Response): Promise<void> => {
+    getAnnouncementById = async (req: Request, res: Response) => {
         try {
             const { id } = req.params;
+
             const { data, error } = await this.announcementService.findAnnouncementById(id);
 
             if (error) {
-                res.status(400).json({ success: false, message: error });
-                return;
+                return res.status(500).json({ success: false, error });
             }
 
             if (!data) {
-                res.status(404).json({
-                    success: false,
-                    message: 'Announcement not found'
-                });
-                return;
+                return res.status(404).json({ success: false, error: 'Duyuru bulunamadı' });
             }
 
-            res.status(200).json({
+            return res.status(200).json({
                 success: true,
-                data
+                data: formatAnnouncementResponse(data)
             });
         } catch (error: any) {
-            console.error('Error in getAnnouncementById controller:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Internal server error',
-                error: error.message
-            });
+            console.error('Duyuru getirme hatası:', error);
+            return res.status(500).json({ success: false, error: error.message });
         }
     }
 
     /**
-     * Get a single announcement by slug
+     * Slug'a göre duyuru getirir
      */
-    getAnnouncementBySlug = async (req: Request, res: Response): Promise<void> => {
+    getAnnouncementBySlug = async (req: Request, res: Response) => {
         try {
             const { slug } = req.params;
+
             const { data, error } = await this.announcementService.findAnnouncementBySlug(slug);
 
             if (error) {
-                res.status(400).json({ success: false, message: error });
-                return;
+                return res.status(500).json({ success: false, error });
             }
 
             if (!data) {
-                res.status(404).json({
-                    success: false,
-                    message: 'Announcement not found'
-                });
-                return;
+                return res.status(404).json({ success: false, error: 'Duyuru bulunamadı' });
             }
 
-            res.status(200).json({
+            return res.status(200).json({
                 success: true,
-                data
+                data: formatAnnouncementResponse(data)
             });
         } catch (error: any) {
-            console.error('Error in getAnnouncementBySlug controller:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Internal server error',
-                error: error.message
-            });
+            console.error('Duyuru getirme hatası:', error);
+            return res.status(500).json({ success: false, error: error.message });
         }
     }
 
     /**
-     * List announcements with pagination
+     * Duyuruları sayfalı olarak listeler
      */
-    listAnnouncements = async (req: Request, res: Response): Promise<void> => {
+    listAnnouncements = async (req: Request, res: Response) => {
         try {
             const page = parseInt(req.query.page as string) || 1;
-            const limit = parseInt(req.query.limit as string) || 10;
+            const pageSize = parseInt(req.query.pageSize as string) || 10;
             const isPublishedOnly = req.query.published === 'true';
 
             const { data, count, error } = await this.announcementService.listAnnouncements(
                 page,
-                limit,
+                pageSize,
                 isPublishedOnly
             );
 
             if (error) {
-                res.status(400).json({ success: false, message: error });
-                return;
+                return res.status(500).json({ success: false, error });
             }
 
-            res.status(200).json({
+            return res.status(200).json({
                 success: true,
-                data,
+                data: data.map(announcement => formatAnnouncementResponse(announcement)),
                 pagination: {
                     page,
-                    limit,
-                    total: count,
-                    pages: Math.ceil(count / limit)
+                    pageSize,
+                    totalCount: count,
+                    totalPages: Math.ceil(count / pageSize)
                 }
             });
         } catch (error: any) {
-            console.error('Error in listAnnouncements controller:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Internal server error',
-                error: error.message
-            });
+            console.error('Duyuru listeleme hatası:', error);
+            return res.status(500).json({ success: false, error: error.message });
         }
     }
 
     /**
-     * Get active announcements
+     * Aktif duyuruları getirir (yayında ve tarih aralığında ise)
      */
-    getActiveAnnouncements = async (req: Request, res: Response): Promise<void> => {
+    getActiveAnnouncements = async (req: Request, res: Response) => {
         try {
             const { data, error } = await this.announcementService.getActiveAnnouncements();
 
             if (error) {
-                res.status(400).json({ success: false, message: error });
-                return;
+                return res.status(500).json({ success: false, error });
             }
 
-            res.status(200).json({
+            return res.status(200).json({
                 success: true,
-                data
+                data: data.map(announcement => formatAnnouncementResponse(announcement))
             });
         } catch (error: any) {
-            console.error('Error in getActiveAnnouncements controller:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Internal server error',
-                error: error.message
-            });
+            console.error('Aktif duyuru getirme hatası:', error);
+            return res.status(500).json({ success: false, error: error.message });
         }
     }
 } 

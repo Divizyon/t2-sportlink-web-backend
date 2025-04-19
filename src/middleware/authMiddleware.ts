@@ -61,6 +61,7 @@ export const protect = authenticate;
 
 // Admin rolü kontrolü
 export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
+  console.log('req.user', req.user);
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Bu işlem için admin yetkisi gerekiyor' });
   }
