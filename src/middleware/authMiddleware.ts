@@ -1,28 +1,70 @@
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import { findUserById } from '../services/userService';
 import { supabase } from '../config/supabase';
 
-export const protect = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const authHeader = req.headers.authorization;
+// Kullanıcı doğrulama için Express Request tipini genişletelim
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        userId: bigint;
+        email: string;
+        role: string;
+      };
+    }
+  }
+}
 
-    if (!authHeader?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Yetkilendirme başarısız. Token bulunamadı.' });
+export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Token'ı header'dan al
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Yetkilendirme başarısız' });
     }
 
     const token = authHeader.split(' ')[1];
-
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-
-    if (error || !user) {
-      return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token.' });
+    if (!token) {
+      return res.status(401).json({ error: 'Geçersiz token formatı' });
     }
 
-    // @ts-ignore
-    req.user = user;
+    // Token'ı doğrula
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret') as {
+      userId: bigint;
+      email: string;
+      role: string;
+    };
+
+    // Kullanıcıyı kontrol et
+    const user = await findUserById(decoded.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'Kullanıcı bulunamadı' });
+    }
+
+    // Request nesnesine kullanıcı bilgilerini ekle
+    req.user = {
+      userId: decoded.userId,
+      email: decoded.email,
+      role: decoded.role
+    };
+
     next();
-  } catch (error: any) {
-    res.status(401).json({ error: 'Yetkilendirme başarısız.' });
+  } catch (error) {
+    console.error('Authentication error:', error);
+    return res.status(401).json({ error: 'Yetkilendirme başarısız' });
   }
+};
+
+// Auth uyumluluğu için eskiden protect adıyla kullanılan middleware'i de export edelim
+export const protect = authenticate;
+
+// Admin rolü kontrolü
+export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Bu işlem için admin yetkisi gerekiyor' });
+  }
+  next();
 };
 
 // Middleware to restrict access to certain roles
@@ -40,7 +82,7 @@ export const restrictTo = (...roles: string[]) => {
       const { data, error } = await supabase
         .from('users')
         .select('role')
-        .eq('id', req.user.id)
+        .eq('id', req.user.userId)
         .single();
 
       if (error || !data) {
@@ -67,55 +109,4 @@ export const restrictTo = (...roles: string[]) => {
       });
     }
   };
-};
-
-// New middleware specifically for admin and superadmin access only
-export const adminOnly = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    if (!req.user) {
-      return res.status(401).json({
-        status: 'error',
-        message: 'Bu işlemi gerçekleştirmek için giriş yapmalısınız.'
-      });
-    }
-
-    // Get user role from the database
-    const { data, error } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', req.user.id)
-      .single();
-
-    if (error || !data) {
-      return res.status(401).json({
-        status: 'error',
-        message: 'Kullanıcı bulunamadı.'
-      });
-    }
-
-    // Check if user has admin or superadmin role
-    if (data.role !== 'admin' && data.role !== 'superadmin') {
-      return res.status(403).json({
-        status: 'error',
-        message: 'Bu işleme erişmek için admin veya superadmin rolüne sahip olmalısınız.'
-      });
-    }
-
-    next();
-  } catch (error) {
-    console.error('Admin authorization error:', error);
-    return res.status(500).json({
-      status: 'error',
-      message: 'Yetkilendirme sırasında bir hata oluştu.'
-    });
-  }
-};
-
-// Add user property to Request interface
-declare global {
-  namespace Express {
-    interface Request {
-      user?: any;
-    }
-  }
-} 
+}; 

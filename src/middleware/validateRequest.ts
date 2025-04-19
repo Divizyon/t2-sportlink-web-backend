@@ -1,18 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
-import { validationResult } from 'express-validator';
+import { validationResult, ValidationError } from 'express-validator';
 
 export const validateRequest = (req: Request, res: Response, next: NextFunction) => {
-    const errors = validationResult(req);
-
-    if (!errors.isEmpty()) {
-        console.log('Validation errors:', JSON.stringify(errors.array(), null, 2));
-        console.log('Request body:', JSON.stringify(req.body, null, 2));
-
-        return res.status(400).json({
-            error: 'Validation error',
-            details: errors.array()
-        });
-    }
-
-    next();
+  const errors = validationResult(req);
+  
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ 
+      errors: errors.array().map((err: ValidationError) => ({
+        field: typeof err === 'object' && 'path' in err ? err.path : 
+               typeof err === 'object' && 'param' in err ? err.param : 'unknown',
+        message: err.msg
+      }))
+    });
+  }
+  
+  next();
 }; 

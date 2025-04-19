@@ -1,20 +1,18 @@
-import express from 'express';
-import { AuthController } from '../controllers/AuthController';
-import { protect } from '../middleware/authMiddleware';
+import { Router } from 'express';
 import { Request, Response } from 'express';
-import { AuthService } from '../services/AuthService';
+import { protect } from '../middleware/authMiddleware';
+import { register, login, logout, resetPassword, getCurrentUser } from '../controllers/AuthController';
+import { body } from 'express-validator';
+import { validateRequest } from '../middleware/validateRequest';
 
-const router = express.Router();
-const authController = new AuthController();
-const authService = new AuthService();
+const router = Router();
 
 /**
  * @swagger
  * /api/auth/register:
  *   post:
- *     tags:
- *       - Authentication
  *     summary: Yeni kullanıcı kaydı
+ *     tags: [Auth]
  *     requestBody:
  *       required: true
  *       content:
@@ -24,25 +22,57 @@ const authService = new AuthService();
  *             required:
  *               - email
  *               - password
+ *               - username
+ *               - first_name
+ *               - last_name
+ *               - phone
+ *               - default_location_latitude
+ *               - default_location_longitude
  *             properties:
  *               email:
  *                 type: string
- *                 format: email
  *               password:
- *                 type: string
- *                 minLength: 6
- *               name:
  *                 type: string
  *               username:
  *                 type: string
- *                 description: Kullanıcı adı (varsayılan olarak email'in @ işaretinden önceki kısmı kullanılır)
+ *               first_name:
+ *                 type: string
+ *               last_name:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               profile_picture:
+ *                 type: string
+ *               default_location_latitude:
+ *                 type: number
+ *               default_location_longitude:
+ *                 type: number
+ *               role:
+ *                 type: string
+ *                 enum: [admin, user, coach]
  *     responses:
  *       201:
  *         description: Kullanıcı başarıyla oluşturuldu
  *       400:
- *         description: Geçersiz input
+ *         description: Hatalı istek veya eksik parametreler
+ *       500:
+ *         description: Sunucu hatası
  */
-router.post('/register', authController.register);
+router.post(
+  '/register',
+  [
+    body('email').isEmail().withMessage('Geçerli bir email adresi giriniz'),
+    body('password').isLength({ min: 6 }).withMessage('Şifre en az 6 karakter olmalıdır'),
+    body('username').notEmpty().withMessage('Kullanıcı adı gereklidir'),
+    body('first_name').notEmpty().withMessage('İsim gereklidir'),
+    body('last_name').notEmpty().withMessage('Soyisim gereklidir'),
+    body('phone').notEmpty().withMessage('Telefon numarası gereklidir'),
+    body('default_location_latitude').isNumeric().withMessage('Geçerli bir konum enlem değeri giriniz'),
+    body('default_location_longitude').isNumeric().withMessage('Geçerli bir konum boylam değeri giriniz')
+  ],
+  validateRequest,
+  register
+);
 
 /**
  * @swagger
@@ -89,9 +119,8 @@ router.post('/register-admin', authController.registerAdmin);
  * @swagger
  * /api/auth/login:
  *   post:
- *     tags:
- *       - Authentication
  *     summary: Kullanıcı girişi
+ *     tags: [Auth]
  *     requestBody:
  *       required: true
  *       content:
@@ -104,23 +133,31 @@ router.post('/register-admin', authController.registerAdmin);
  *             properties:
  *               username:
  *                 type: string
- *                 description: Kullanıcı adı (şu an için email adresi olmalıdır)
  *               password:
  *                 type: string
  *     responses:
  *       200:
  *         description: Başarılı giriş
  *       401:
- *         description: Geçersiz kimlik bilgileri
+ *         description: Hatalı giriş bilgileri
+ *       500:
+ *         description: Sunucu hatası
  */
-router.post('/login', authController.login);
+router.post(
+  '/login',
+  [
+    body('email').isEmail().withMessage('Geçerli bir email adresi giriniz'),
+    body('password').notEmpty().withMessage('Şifre gereklidir')
+  ],
+  validateRequest,
+  login
+);
 
 /**
  * @swagger
  * /api/auth/logout:
  *   post:
- *     tags:
- *       - Authentication
+ *     tags: [Auth]
  *     summary: Kullanıcı çıkışı
  *     security:
  *       - bearerAuth: []
@@ -130,14 +167,13 @@ router.post('/login', authController.login);
  *       401:
  *         description: Yetkilendirme hatası
  */
-router.post('/logout', protect, authController.logout);
+router.post('/logout', protect, logout);
 
 /**
  * @swagger
  * /api/auth/reset-password:
  *   post:
- *     tags:
- *       - Authentication
+ *     tags: [Auth]
  *     summary: Şifre sıfırlama
  *     requestBody:
  *       required: true
@@ -157,24 +193,13 @@ router.post('/logout', protect, authController.logout);
  *       400:
  *         description: Geçersiz email
  */
-router.post('/reset-password', async (req: Request, res: Response) => {
-    try {
-        const result = await authService.resetPassword(req.body);
-        if (result.error) {
-            return res.status(400).json({ error: result.error });
-        }
-        res.json({ message: 'Password reset email sent' });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
-});
+router.post('/reset-password', resetPassword);
 
 /**
  * @swagger
  * /api/auth/me:
  *   get:
- *     tags:
- *       - Authentication
+ *     tags: [Auth]
  *     summary: Mevcut kullanıcı bilgilerini getir
  *     security:
  *       - bearerAuth: []
@@ -184,18 +209,6 @@ router.post('/reset-password', async (req: Request, res: Response) => {
  *       401:
  *         description: Yetkilendirme hatası
  */
-router.get('/me', protect, authController.getCurrentUser);
-
-router.get('/check-user/:email', async (req: Request, res: Response) => {
-    try {
-        const { exists, error } = await authService.checkUserExists(req.params.email);
-        if (error) {
-            return res.status(400).json({ error });
-        }
-        res.json({ exists });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
-});
+router.get('/me', protect, getCurrentUser);
 
 export default router; 
