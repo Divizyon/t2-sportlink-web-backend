@@ -8,6 +8,7 @@ import exampleRoutes from './routes/exampleRoutes';
 import eventRoutes from './routes/eventRoutes';
 import authRoutes from './routes/authRoutes';
 import profileRoutes from './routes/profileRoutes';
+import adminRoutes from './routes/adminRoutes';
 import prisma from './config/prisma';
 import announcementRoutes from './routes/announcementRoutes';
 import newsRoutes from './routes/newsRoutes';
@@ -37,6 +38,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/announcements', announcementRoutes);
 app.use('/api/news', newsRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api', eventRoutes);
 app.use('/api', exampleRoutes); 
 

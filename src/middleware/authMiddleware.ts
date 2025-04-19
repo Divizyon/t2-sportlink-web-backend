@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { findUserById } from '../services/userService';
-import { supabase } from '../config/supabase';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 // Kullanıcı doğrulama için Express Request tipini genişletelim
 declare global {
@@ -81,15 +83,13 @@ export const restrictTo = (...roles: string[]) => {
         });
       }
       
+      // Get user role from the database using Prisma
+      const user = await prisma.users.findUnique({
+        where: { id: req.user.userId as bigint },
+        select: { role: true }
+      });
 
-      // Get user role from the database
-      const { data, error } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', req.user.userId)
-        .single();
-
-      if (error || !data) {
+      if (!user) {
         return res.status(401).json({
           status: 'error',
           message: 'Kullanıcı bulunamadı.'
@@ -97,7 +97,7 @@ export const restrictTo = (...roles: string[]) => {
       }
 
       // Check if user role is allowed
-      if (!roles.includes(data.role)) {
+      if (!roles.includes(user.role)) {
         return res.status(403).json({
           status: 'error',
           message: 'Bu işlemi gerçekleştirmek için yetkiniz yok.'
