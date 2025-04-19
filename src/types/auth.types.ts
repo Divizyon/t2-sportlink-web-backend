@@ -1,7 +1,16 @@
+import { User } from '../models/User';
+
 export interface RegisterDTO {
     email: string;
     password: string;
-    name?: string;
+    username: string;
+    first_name: string;
+    last_name: string;
+    phone: string;
+    profile_picture?: string;
+    default_location_latitude: number;
+    default_location_longitude: number;
+    role?: 'admin' | 'user' | 'coach';
 }
 
 export interface LoginDTO {
@@ -10,8 +19,9 @@ export interface LoginDTO {
 }
 
 export interface AuthResponse {
-    user: any;
-    session: any;
+    user: Partial<User>;
+    token: string;
+    message: string;
     error?: string;
 }
 

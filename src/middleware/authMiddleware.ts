@@ -1,28 +1,70 @@
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import { findUserById } from '../services/userService';
 import { supabase } from '../config/supabase';
 
-export const protect = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-        const authHeader = req.headers.authorization;
-
-        if (!authHeader?.startsWith('Bearer ')) {
-            return res.status(401).json({ error: 'Yetkilendirme başarısız. Token bulunamadı.' });
-        }
-
-        const token = authHeader.split(' ')[1];
-        
-        const { data: { user }, error } = await supabase.auth.getUser(token);
-
-        if (error || !user) {
-            return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş token.' });
-        }
-
-        // @ts-ignore
-        req.user = user;
-        next();
-    } catch (error: any) {
-        res.status(401).json({ error: 'Yetkilendirme başarısız.' });
+// Kullanıcı doğrulama için Express Request tipini genişletelim
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        userId: bigint;
+        email: string;
+        role: string;
+      };
     }
+  }
+}
+
+export const authenticate = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Token'ı header'dan al
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Yetkilendirme başarısız' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ error: 'Geçersiz token formatı' });
+    }
+
+    // Token'ı doğrula
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret') as {
+      userId: bigint;
+      email: string;
+      role: string;
+    };
+
+    // Kullanıcıyı kontrol et
+    const user = await findUserById(decoded.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'Kullanıcı bulunamadı' });
+    }
+
+    // Request nesnesine kullanıcı bilgilerini ekle
+    req.user = {
+      userId: decoded.userId,
+      email: decoded.email,
+      role: decoded.role
+    };
+
+    next();
+  } catch (error) {
+    console.error('Authentication error:', error);
+    return res.status(401).json({ error: 'Yetkilendirme başarısız' });
+  }
+};
+
+// Auth uyumluluğu için eskiden protect adıyla kullanılan middleware'i de export edelim
+export const protect = authenticate;
+
+// Admin rolü kontrolü
+export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.user || req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Bu işlem için admin yetkisi gerekiyor' });
+  }
+  next();
 };
 
 // Middleware to restrict access to certain roles
@@ -40,7 +82,7 @@ export const restrictTo = (...roles: string[]) => {
       const { data, error } = await supabase
         .from('users')
         .select('role')
-        .eq('id', req.user.id)
+        .eq('id', req.user.userId)
         .single();
 
       if (error || !data) {
@@ -67,13 +109,4 @@ export const restrictTo = (...roles: string[]) => {
       });
     }
   };
-};
-
-// Add user property to Request interface
-declare global {
-  namespace Express {
-    interface Request {
-      user?: any;
-    }
-  }
-} 
+}; 

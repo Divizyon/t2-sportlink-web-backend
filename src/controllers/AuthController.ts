@@ -1,113 +1,123 @@
 import { Request, Response } from 'express';
-import { AuthService } from '../services/AuthService';
+import { findUserByEmail, createUser } from '../services/userService';
 import { RegisterDTO, LoginDTO, ResetPasswordDTO } from '../types/auth.types';
+import jwt, { SignOptions } from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
 
-export class AuthController {
-    private authService: AuthService;
-
-    constructor() {
-        this.authService = new AuthService();
-    }
-
-    public register = async (req: Request, res: Response): Promise<Response> => {
-        try {
-            console.log('Register request received:', req.body);
-            
-            const registerData: RegisterDTO = req.body;
-            
-            // Email formatı kontrolü
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(registerData.email)) {
-                return res.status(400).json({ 
-                    error: 'Geçersiz email formatı',
-                    details: 'Lütfen geçerli bir email adresi giriniz'
-                });
-            }
-
-            // Şifre kontrolü
-            if (!registerData.password || registerData.password.length < 6) {
-                return res.status(400).json({ 
-                    error: 'Geçersiz şifre',
-                    details: 'Şifre en az 6 karakter olmalıdır'
-                });
-            }
-
-            console.log('Validations passed, attempting registration...');
-            
-            const result = await this.authService.register(registerData);
-            
-            console.log('Registration result:', result);
-            
-            if (result.error) {
-                return res.status(400).json({ 
-                    error: result.error,
-                    details: 'Kayıt işlemi başarısız'
-                });
-            }
-
-            return res.status(201).json(result);
-        } catch (error: any) {
-            console.error('Registration error:', error);
-            return res.status(500).json({ 
-                error: error.message,
-                details: 'Sunucu hatası oluştu'
-            });
+export const register = async (req: Request, res: Response): Promise<Response> => {
+    try {
+        const userData: RegisterDTO = req.body;
+        
+        // Check if user already exists
+        const existingUser = await findUserByEmail(userData.email);
+        if (existingUser) {
+            return res.status(400).json({ error: 'Email zaten kullanımda' });
         }
-    }
-
-    public login = async (req: Request, res: Response): Promise<Response> => {
-        try {
-            const { email, password } = req.body;
-            const result = await this.authService.login(email, password);
-
-            if (result.error) {
-                return res.status(400).json({ error: result.error });
+        
+        // Create new user
+        const newUser = await createUser(userData);
+        
+        // Create JWT token
+        const token = jwt.sign(
+            { userId: newUser.id, email: newUser.email, role: newUser.role },
+            process.env.JWT_SECRET || 'default_secret',
+            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as SignOptions
+        );
+        
+        return res.status(201).json({
+            message: 'Kullanıcı başarıyla kaydedildi',
+            token,
+            user: {
+                id: newUser.id,
+                email: newUser.email,
+                username: newUser.username,
+                first_name: newUser.first_name,
+                last_name: newUser.last_name,
+                role: newUser.role
             }
-
-            return res.json({
-                user: result.user,
-                session: result.session
-            });
-        } catch (error: any) {
-            return res.status(500).json({ error: error.message });
-        }
+        });
+    } catch (error) {
+        console.error('Kayıt hatası:', error);
+        return res.status(500).json({ error: 'Kayıt işlemi başarısız oldu' });
     }
+};
 
-    public logout = async (req: Request, res: Response): Promise<Response> => {
-        try {
-            await this.authService.logout();
-            return res.status(200).json({ message: 'Başarıyla çıkış yapıldı' });
-        } catch (error: any) {
-            return res.status(500).json({ error: error.message });
+export const login = async (req: Request, res: Response): Promise<Response> => {
+    try {
+        const { email, password }: LoginDTO = req.body;
+        
+        // Find user by email
+        const user = await findUserByEmail(email);
+        if (!user) {
+            return res.status(401).json({ error: 'Geçersiz kimlik bilgileri' });
         }
-    }
-
-    public resetPassword = async (req: Request, res: Response): Promise<Response> => {
-        try {
-            const resetData: ResetPasswordDTO = req.body;
-            const result = await this.authService.resetPassword(resetData);
-
-            if (result.error) {
-                return res.status(400).json({ error: result.error });
+        
+        // Verify password
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(401).json({ error: 'Geçersiz kimlik bilgileri' });
+        }
+        
+        // Create JWT token
+        const token = jwt.sign(
+            { userId: user.id, email: user.email, role: user.role },
+            process.env.JWT_SECRET || 'default_secret',
+            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' } as SignOptions
+        );
+        
+        return res.status(200).json({
+            message: 'Giriş başarılı',
+            token,
+            user: {
+                id: user.id,
+                email: user.email,
+                username: user.username,
+                first_name: user.first_name,
+                last_name: user.last_name,
+                role: user.role
             }
-
-            return res.status(200).json({ message: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi' });
-        } catch (error: any) {
-            return res.status(500).json({ error: error.message });
-        }
+        });
+    } catch (error) {
+        console.error('Giriş hatası:', error);
+        return res.status(500).json({ error: 'Giriş başarısız oldu' });
     }
+};
 
-    public getCurrentUser = async (req: Request, res: Response): Promise<Response> => {
-        try {
-            const result = await this.authService.getCurrentUser();
-
-            if (result.error) {
-                return res.status(401).json({ error: result.error });
-            }
-
-            return res.status(200).json(result);
-        } catch (error: any) {
-            return res.status(500).json({ error: error.message });
-        }
+export const logout = async (req: Request, res: Response): Promise<Response> => {
+    try {
+        return res.status(200).json({ message: 'Başarıyla çıkış yapıldı' });
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
     }
-} 
+};
+
+export const resetPassword = async (req: Request, res: Response): Promise<Response> => {
+    try {
+        const resetData: ResetPasswordDTO = req.body;
+        
+        // Burada şifre sıfırlama işlemi yapılacak
+        // Örnek: Email gönderilmesi, token oluşturulması vb.
+        
+        return res.status(200).json({ message: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi' });
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+};
+
+export const getCurrentUser = async (req: Request, res: Response): Promise<Response> => {
+    try {
+        // @ts-ignore
+        const userId = req.user?.userId;
+        
+        if (!userId) {
+            return res.status(401).json({ error: 'Yetkisiz erişim' });
+        }
+        
+        // Get user from database
+        // ...
+        
+        return res.status(200).json({ user: req.user });
+    } catch (error: any) {
+        return res.status(500).json({ error: error.message });
+    }
+}; 

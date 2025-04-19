@@ -1,83 +1,62 @@
-import supabase from '../config/supabase';
-import { User, CreateUserDTO } from '../models/User';
+import prisma from '../config/prisma';
+import { CreateUserDTO, UpdateUserDTO } from '../models/User';
+import bcrypt from 'bcrypt';
 
-export const findUserById = async (id: string): Promise<User | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) throw error;
-    return data as User;
-  } catch (error) {
-    console.error('Error finding user by ID:', error);
-    return null;
-  }
+export const findUserById = async (id: bigint) => {
+  return prisma.users.findUnique({
+    where: { id }
+  });
 };
 
-export const findUserByEmail = async (email: string): Promise<User | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single();
-
-    if (error) throw error;
-    return data as User;
-  } catch (error) {
-    console.error('Error finding user by email:', error);
-    return null;
-  }
+export const findUserByEmail = async (email: string) => {
+  return prisma.users.findFirst({
+    where: { email }
+  });
 };
 
-export const createUser = async (userData: CreateUserDTO): Promise<User | null> => {
-  try {
-    // First, create the auth user
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: userData.email,
-      password: userData.password,
-    });
-
-    if (authError) throw authError;
-    
-    if (!authData.user) {
-      throw new Error('Auth user creation failed');
+export const createUser = async (userData: CreateUserDTO) => {
+  const hashedPassword = await bcrypt.hash(userData.password, 10);
+  
+  return prisma.users.create({
+    data: {
+      ...userData,
+      password: hashedPassword,
+      profile_picture: userData.profile_picture || '',
+      role: userData.role || 'user'
     }
-
-    // Then create the user profile in our users table
-    const { data, error } = await supabase
-      .from('users')
-      .insert({
-        id: authData.user.id,
-        email: userData.email,
-        first_name: userData.first_name,
-        last_name: userData.last_name,
-        role: userData.role || 'user',
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data as User;
-  } catch (error) {
-    console.error('Error creating user:', error);
-    return null;
-  }
+  });
 };
 
-export const getAllUsers = async (): Promise<User[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*');
+export const updateUser = async (id: bigint, userData: UpdateUserDTO) => {
+  return prisma.users.update({
+    where: { id },
+    data: userData
+  });
+};
 
-    if (error) throw error;
-    return data as User[];
-  } catch (error) {
-    console.error('Error getting all users:', error);
-    return [];
-  }
+export const deleteUser = async (id: bigint) => {
+  return prisma.users.delete({
+    where: { id }
+  });
+};
+
+export const getAllUsers = async (skip = 0, take = 10) => {
+  return prisma.users.findMany({
+    skip,
+    take,
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      first_name: true,
+      last_name: true,
+      role: true,
+      profile_picture: true,
+      phone: true,
+      default_location_latitude: true,
+      default_location_longitude: true,
+      created_at: true,
+      updated_at: true
+    }
+  });
 }; 

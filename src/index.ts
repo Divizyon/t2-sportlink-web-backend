@@ -5,12 +5,10 @@ import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger';
 import authRoutes from './routes/authRoutes';
 import profileRoutes from './routes/profileRoutes';
+import prisma from './config/prisma';
 
 // Load environment variables
 dotenv.config();
-
-
-
 
 const app = express();
 
