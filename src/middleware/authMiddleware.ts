@@ -67,6 +67,9 @@ export const isAdmin = (req: Request, res: Response, next: NextFunction) => {
   next();
 };
 
+// Admin rolü kontrolü için kısa yol middleware
+export const adminOnly = isAdmin;
+
 // Middleware to restrict access to certain roles
 export const restrictTo = (...roles: string[]) => {
   return async (req: Request, res: Response, next: NextFunction) => {

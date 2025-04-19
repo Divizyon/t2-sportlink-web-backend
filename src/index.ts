@@ -9,6 +9,8 @@ import eventRoutes from './routes/eventRoutes';
 import authRoutes from './routes/authRoutes';
 import profileRoutes from './routes/profileRoutes';
 import prisma from './config/prisma';
+import announcementRoutes from './routes/announcementRoutes';
+import newsRoutes from './routes/newsRoutes';
 
 // Load environment variables
 dotenv.config();
