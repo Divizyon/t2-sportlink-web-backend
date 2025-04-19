@@ -14,8 +14,9 @@ export interface RegisterDTO {
 }
 
 export interface LoginDTO {
-    email: string;
+    username: string;
     password: string;
+    email?: string;
 }
 
 export interface AuthResponse {
@@ -23,6 +24,7 @@ export interface AuthResponse {
     token: string;
     message: string;
     error?: string;
+    session?: any;
 }
 
 export interface ResetPasswordDTO {

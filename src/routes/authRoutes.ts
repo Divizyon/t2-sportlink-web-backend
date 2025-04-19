@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Request, Response } from 'express';
 import { protect } from '../middleware/authMiddleware';
-import { register, login, logout, resetPassword, getCurrentUser } from '../controllers/AuthController';
+import { register, login, logout, resetPassword, getCurrentUser, registerAdmin } from '../controllers/AuthController';
 import { body } from 'express-validator';
 import { validateRequest } from '../middleware/validateRequest';
 
@@ -76,10 +76,11 @@ router.post(
 
 /**
  * @swagger
- * /api/auth/login:
+ * /api/auth/register-admin:
  *   post:
- *     summary: Kullanıcı girişi
- *     tags: [Auth]
+ *     tags:
+ *       - Authentication
+ *     summary: Yeni admin veya süper admin kullanıcı kaydı
  *     requestBody:
  *       required: true
  *       content:
@@ -91,6 +92,46 @@ router.post(
  *               - password
  *             properties:
  *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 minLength: 6
+ *               name:
+ *                 type: string
+ *               username:
+ *                 type: string
+ *                 description: Kullanıcı adı (varsayılan olarak email'in @ işaretinden önceki kısmı kullanılır)
+ *               role:
+ *                 type: string
+ *                 enum: [admin, superadmin]
+ *                 default: admin
+ *                 description: Kullanıcı rolü - admin veya superadmin
+ *     responses:
+ *       201:
+ *         description: Admin kullanıcı başarıyla oluşturuldu
+ *       400:
+ *         description: Geçersiz input
+ */
+router.post('/register-admin', registerAdmin);
+
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Kullanıcı girişi
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - username
+ *               - password
+ *             properties:
+ *               username:
  *                 type: string
  *               password:
  *                 type: string
