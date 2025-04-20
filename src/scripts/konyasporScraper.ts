@@ -754,17 +754,13 @@ async function checkIfNewsExists(title: string, sourceUrl: string): Promise<bool
       );
     }
     
-    // Öncelikle source_url'e göre kontrol et - bu daha hızlıdır
-    console.log('Kaynak URL ile kontrol ediliyor');
-    const result = await newsService.listNews(1, 100);
+    // Doğrudan source_url'e göre sorgula - bu çok daha hızlı ve kesindir
+    console.log('Kaynak URL ile doğrudan kontrol ediliyor');
+    const result = await newsService.findBySourceUrl(sourceUrl);
     
-    if (!result.error && result.data) {
-      // Aynı source_url'e sahip haber var mı kontrol et
-      const existsByUrl = result.data.some(news => news.source_url === sourceUrl);
-      if (existsByUrl) {
-        console.log(`URL ile eşleşen haber bulundu: ${sourceUrl}`);
-        return true;
-      }
+    if (result.data) {
+      console.log(`URL ile eşleşen haber bulundu: ${sourceUrl} (ID: ${result.data.id})`);
+      return true;
     }
     
     // URL ile bulunamazsa, başlığa göre ara

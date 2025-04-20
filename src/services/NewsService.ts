@@ -292,4 +292,34 @@ export class NewsService {
             return { error: error.message || 'Failed to list active news', data: null, count: 0 };
         }
     }
+
+    /**
+     * Find news by source_url
+     */
+    async findBySourceUrl(sourceUrl: string) {
+        try {
+            console.log(`Source URL ile haber aranıyor: ${sourceUrl}`);
+            
+            const { data, error } = await supabaseAdmin
+                .from(this.TABLE_NAME)
+                .select('id, title, source_url')
+                .eq('source_url', sourceUrl);
+
+            if (error) {
+                console.error('Error finding news by source_url:', error);
+                return { error: error.message, data: null };
+            }
+
+            // Eğer veri varsa (boş değilse ve en az bir öğe içeriyorsa)
+            if (data && data.length > 0) {
+                console.log(`${data.length} adet eşleşen haber bulundu.`);
+                return { data: data[0], error: null, count: data.length };
+            } else {
+                return { data: null, error: null, count: 0 };
+            }
+        } catch (error: any) {
+            console.error('Unexpected error in findBySourceUrl service:', error);
+            return { error: error.message || 'Failed to find news by source_url', data: null };
+        }
+    }
 } 
