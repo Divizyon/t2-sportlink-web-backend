@@ -5,13 +5,13 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import userRoutes from './routes/userRoutes';
-import exampleRoutes from './routes/exampleRoutes';
 import eventRoutes from './routes/eventRoutes';
 import authRoutes from './routes/authRoutes';
 import profileRoutes from './routes/profileRoutes';
 import announcementRoutes from './routes/announcementRoutes';
 import newsRoutes from './routes/newsRoutes';
 import sportRoutes from './routes/sportRoutes';
+import adminRoutes from './routes/adminRoutes';
 import { setupEventCronJobs } from './cron/eventStatusUpdater';
 
 // Load environment variables
