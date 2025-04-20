@@ -8,7 +8,10 @@ export const getAllUsers = async (req: Request, res: Response) => {
 
     const skip = (page - 1) * pageSize;
     const users = await userService.getAllUsers(skip, pageSize);
-    const total = users.length; // Basitleştirilmiş toplam sayı
+    
+    // Gerçek toplam sayıyı almak için count sorgusunu kullan
+    const count = await userService.countUsers();
+    const total = count;
 
     res.status(200).json({
       status: 'success',
