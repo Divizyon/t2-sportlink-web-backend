@@ -1,6 +1,6 @@
 import express from 'express';
 import { EventController } from '../controllers/EventController';
-import { protect, isAdmin } from '../middleware/authMiddleware';
+import { protect, restrictTo } from '../middleware/authMiddleware';
 
 const router = express.Router();
 const eventController = new EventController();
@@ -22,10 +22,10 @@ router.get('/my/events', protect, eventController.getUserEvents.bind(eventContro
 router.get('/user/:userId/created', protect, eventController.getUserCreatedEvents.bind(eventController));
 router.get('/my/created', protect, eventController.getUserCreatedEvents.bind(eventController));
 
-// Admin routes - require admin role
-router.get('/admin/pending', protect, isAdmin, eventController.getPendingEvents.bind(eventController));
-router.post('/admin/:id/approve', protect, isAdmin, eventController.approveEvent.bind(eventController));
-router.post('/admin/:id/reject', protect, isAdmin, eventController.rejectEvent.bind(eventController));
-router.post('/admin/update-expired', protect, isAdmin, eventController.updateExpiredPendingEvents.bind(eventController));
+// Admin routes - require admin or superadmin role
+router.get('/admin/pending', protect, restrictTo('admin', 'superadmin'), eventController.getPendingEvents.bind(eventController));
+router.post('/admin/:id/approve', protect, restrictTo('admin', 'superadmin'), eventController.approveEvent.bind(eventController));
+router.post('/admin/:id/reject', protect, restrictTo('admin', 'superadmin'), eventController.rejectEvent.bind(eventController));
+router.post('/admin/update-expired', protect, restrictTo('admin', 'superadmin'), eventController.updateExpiredPendingEvents.bind(eventController));
 
 export default router; 
