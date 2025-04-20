@@ -4,6 +4,9 @@ import { RegisterDTO, LoginDTO, ResetPasswordDTO } from '../types/auth.types';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import { AuthService } from '../services/authService';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 // BigInt için JSON serializer düzeltmesi
 // Bu, BigInt değerleri string'e dönüştürmek için JSON.stringify'ı extend eder
@@ -127,9 +130,40 @@ export const getCurrentUser = async (req: Request, res: Response): Promise<Respo
         }
         
         // Get user from database
-        // ...
+        const user = await prisma.users.findUnique({
+            where: { id: BigInt(userId) },
+            select: {
+                id: true,
+                username: true,
+                email: true,
+                first_name: true,
+                last_name: true,
+                role: true,
+                phone: true,
+                profile_picture: true,
+                default_location_latitude: true,
+                default_location_longitude: true,
+                created_at: true,
+                updated_at: true
+            }
+        });
+
+        if (!user) {
+            return res.status(404).json({ error: 'Kullanıcı bulunamadı' });
+        }
+
+        // BigInt id'yi string'e çevir
+        const formattedUser = {
+            ...user,
+            id: user.id.toString()
+        };
         
-        return res.status(200).json({ user: req.user });
+        return res.status(200).json({
+            status: 'success',
+            data: {
+                user: formattedUser
+            }
+        });
     } catch (error: any) {
         return res.status(500).json({ error: error.message });
     }

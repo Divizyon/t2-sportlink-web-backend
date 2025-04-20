@@ -12,7 +12,12 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "ts-node prisma/seed.ts"
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "scrape:konyaspor": "ts-node src/scripts/konyasporScraper.ts",
+    "update:news": "ts-node src/scripts/updateNewsContent.ts",
+    "scrape:sporx": "ts-node src/scripts/sporxScraper.ts",
+    "scrape:news": "ts-node src/scripts/newsScraper.ts",
+    "scrape:all": "npm run scrape:konyaspor && npm run scrape:sporx && npm run scrape:news && npm run update:news"
   },
   "keywords": [
     "sportlink",
@@ -25,6 +30,7 @@
   "dependencies": {
     "@prisma/client": "^6.6.0",
     "@supabase/supabase-js": "^2.39.7",
+    "@types/node-cron": "^3.0.11",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
     "bcrypt": "^5.1.1",
@@ -35,6 +41,7 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "node-cron": "^3.0.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   },

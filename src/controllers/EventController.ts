@@ -17,9 +17,9 @@ export class EventController {
     async createEvent(req: Request, res: Response) {
         try {
             console.log('Received create event request:', req.body);
-            
+
             const { title, description, event_date, start_time, end_time, location_name,
-                location_latitude, location_longitude, max_participants, sport_id, status } = req.body;
+                location_latitude, location_longitude, max_participants, sport_id } = req.body;
 
             // Validate required fields
             if (!title || !description || !event_date || !start_time || !end_time || !location_name) {
@@ -33,7 +33,7 @@ export class EventController {
             // Get user from request
             const userId = req.user?.userId;
             console.log('User ID creating event:', userId);
-            
+
             if (!userId) {
                 return res.status(401).json({
                     success: false,
@@ -53,7 +53,8 @@ export class EventController {
                 location_longitude,
                 max_participants,
                 sport_id: BigInt(sport_id),
-                status: status || 'active',
+                status: 'active', // This will be overridden in service
+                approval_status: 'pending', // This will be set in service
                 creator_id: BigInt(userId)
             });
 
@@ -68,7 +69,7 @@ export class EventController {
             console.log('Event created successfully:', data);
             return res.status(201).json({
                 success: true,
-                message: 'Event created successfully',
+                message: 'Event created successfully and awaiting admin approval',
                 data,
             });
         } catch (error: any) {
@@ -354,7 +355,7 @@ export class EventController {
             // Get user from request
             const userId = req.user?.userId;
             console.log(`User ID attempting to join: ${userId}`);
-            
+
             if (!userId) {
                 return res.status(401).json({
                     success: false,
@@ -398,7 +399,7 @@ export class EventController {
             // Get user from request
             const userId = req.user?.userId;
             console.log(`User ID attempting to leave: ${userId}`);
-            
+
             if (!userId) {
                 return res.status(401).json({
                     success: false,
@@ -426,6 +427,253 @@ export class EventController {
             return res.status(500).json({
                 success: false,
                 message: 'Failed to leave event',
+                error: error.message,
+            });
+        }
+    }
+
+    /**
+     * Get all pending events for admin approval
+     */
+    async getPendingEvents(req: Request, res: Response) {
+        try {
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 10;
+
+            // Get admin ID from request
+            const adminId = req.user?.userId;
+            if (!adminId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Authentication required',
+                });
+            }
+
+            const { data, error } = await this.eventService.getPendingEvents(page, limit);
+
+            if (error) {
+                return res.status(400).json({
+                    success: false,
+                    message: error,
+                });
+            }
+
+            return res.status(200).json({
+                success: true,
+                ...data,
+            });
+        } catch (error: any) {
+            console.error('Error in getPendingEvents controller:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to get pending events',
+                error: error.message,
+            });
+        }
+    }
+
+    /**
+     * Approve an event
+     */
+    async approveEvent(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+
+            // Get admin ID from request
+            const adminId = req.user?.userId;
+            if (!adminId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Authentication required',
+                });
+            }
+
+            const { success, error } = await this.eventService.approveEvent(id, adminId.toString());
+
+            if (!success) {
+                return res.status(400).json({
+                    success: false,
+                    message: error || 'Failed to approve event',
+                });
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: 'Event approved successfully',
+            });
+        } catch (error: any) {
+            console.error('Error in approveEvent controller:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to approve event',
+                error: error.message,
+            });
+        }
+    }
+
+    /**
+     * Reject an event
+     */
+    async rejectEvent(req: Request, res: Response) {
+        try {
+            const { id } = req.params;
+            const { reason } = req.body;
+
+            // Get admin ID from request
+            const adminId = req.user?.userId;
+            if (!adminId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Authentication required',
+                });
+            }
+
+            const { success, error } = await this.eventService.rejectEvent(id, adminId.toString(), reason);
+
+            if (!success) {
+                return res.status(400).json({
+                    success: false,
+                    message: error || 'Failed to reject event',
+                });
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: 'Event rejected successfully',
+            });
+        } catch (error: any) {
+            console.error('Error in rejectEvent controller:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to reject event',
+                error: error.message,
+            });
+        }
+    }
+
+    /**
+     * Check and update expired pending events
+     */
+    async updateExpiredPendingEvents(req: Request, res: Response) {
+        try {
+            // Get admin ID from request
+            const adminId = req.user?.userId;
+            if (!adminId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Authentication required',
+                });
+            }
+
+            const { success, count, error } = await this.eventService.updateExpiredPendingEvents();
+
+            if (!success) {
+                return res.status(400).json({
+                    success: false,
+                    message: error || 'Failed to update expired pending events',
+                });
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: `Updated ${count} expired pending events`,
+                count,
+            });
+        } catch (error: any) {
+            console.error('Error in updateExpiredPendingEvents controller:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Failed to update expired pending events',
+                error: error.message,
+            });
+        }
+    }
+
+    /**
+     * Kullanıcının katıldığı etkinlikleri getir
+     */
+    async getUserEvents(req: Request, res: Response) {
+        try {
+            // URL'den kullanıcı ID'sini al, eğer belirtilmemişse kendi ID'sini kullan
+            const userId = req.params.userId || req.user?.userId;
+            console.log(`Fetching events for user ID: ${userId}`);
+
+            // Kullanıcı kontrolü
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Kimlik doğrulama gerekli',
+                });
+            }
+
+            // Sayfalama parametrelerini al
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 10;
+
+            // Servis metodu ile etkinlikleri getir
+            const { data, error } = await this.eventService.getUserEvents(userId.toString(), page, limit);
+
+            if (error) {
+                return res.status(400).json({
+                    success: false,
+                    message: error,
+                });
+            }
+
+            return res.status(200).json({
+                status: 'success',
+                data,
+            });
+        } catch (error: any) {
+            console.error('Kullanıcı etkinlikleri alınırken hata:', error);
+            return res.status(500).json({
+                status: 'error',
+                message: 'Kullanıcının etkinlikleri getirilirken hata oluştu',
+                error: error.message,
+            });
+        }
+    }
+
+    /**
+     * Kullanıcının oluşturduğu etkinlikleri getir
+     */
+    async getUserCreatedEvents(req: Request, res: Response) {
+        try {
+            // URL'den kullanıcı ID'sini al, eğer belirtilmemişse kendi ID'sini kullan
+            const userId = req.params.userId || req.user?.userId;
+            console.log(`Fetching created events for user ID: ${userId}`);
+
+            // Kullanıcı kontrolü
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Kimlik doğrulama gerekli',
+                });
+            }
+
+            // Sayfalama parametrelerini al
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 10;
+
+            // Servis metodu ile etkinlikleri getir
+            const { data, error } = await this.eventService.getUserCreatedEvents(userId.toString(), page, limit);
+
+            if (error) {
+                return res.status(400).json({
+                    success: false,
+                    message: error,
+                });
+            }
+
+            return res.status(200).json({
+                status: 'success',
+                data,
+            });
+        } catch (error: any) {
+            console.error('Kullanıcının oluşturduğu etkinlikler alınırken hata:', error);
+            return res.status(500).json({
+                status: 'error',
+                message: 'Kullanıcının oluşturduğu etkinlikler getirilirken hata oluştu',
                 error: error.message,
             });
         }

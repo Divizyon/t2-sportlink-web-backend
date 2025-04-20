@@ -1,4 +1,4 @@
-import { supabase } from '../config/supabase';
+import { supabase, supabaseAdmin } from '../config/supabase';
 import { generateSlug } from '../utils/stringUtils';
 
 interface News {
@@ -14,7 +14,7 @@ interface News {
 }
 
 export class NewsService {
-    private readonly TABLE_NAME = 'news';
+    private readonly TABLE_NAME = 'News';
 
     /**
      * Create a new news article
@@ -27,7 +27,7 @@ export class NewsService {
             data.updated_at = now;
 
             // Insert news into database
-            const { data: insertedNews, error } = await supabase
+            const { data: insertedNews, error } = await supabaseAdmin
                 .from(this.TABLE_NAME)
                 .insert(data)
                 .select('*')
@@ -53,8 +53,8 @@ export class NewsService {
             // Update timestamp
             data.updated_at = new Date().toISOString();
 
-            // Update news in database
-            const { data: updatedNews, error } = await supabase
+            // Update news in database with admin rights
+            const { data: updatedNews, error } = await supabaseAdmin
                 .from(this.TABLE_NAME)
                 .update(data)
                 .eq('id', id)
@@ -79,7 +79,7 @@ export class NewsService {
     async deleteNews(id: string) {
         try {
             // Delete news from database
-            const { error } = await supabase
+            const { error } = await supabaseAdmin
                 .from(this.TABLE_NAME)
                 .delete()
                 .eq('id', id);
@@ -101,7 +101,7 @@ export class NewsService {
      */
     async findNewsById(id: string) {
         try {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseAdmin
                 .from(this.TABLE_NAME)
                 .select(`
                     *,
@@ -131,7 +131,7 @@ export class NewsService {
             const offset = (page - 1) * limit;
 
             // Build query
-            let query = supabase
+            let query = supabaseAdmin
                 .from(this.TABLE_NAME)
                 .select(`
                     *,
@@ -168,7 +168,7 @@ export class NewsService {
     async getRecentNews(limit: number, sport_id?: string) {
         try {
             // Build query
-            let query = supabase
+            let query = supabaseAdmin
                 .from(this.TABLE_NAME)
                 .select(`
                     *,
@@ -204,7 +204,7 @@ export class NewsService {
      */
     async searchNews(searchTerm: string, limit: number = 10) {
         try {
-            const { data, error } = await supabase
+            const { data, error } = await supabaseAdmin
                 .from(this.TABLE_NAME)
                 .select(`
                     *,
