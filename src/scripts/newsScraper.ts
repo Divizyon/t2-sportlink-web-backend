@@ -171,18 +171,49 @@ function formatUrl(url: string, baseUrl: string): string {
  */
 async function checkIfNewsExists(title: string, sourceUrl: string): Promise<boolean> {
   try {
-    // Başlık ile haberi ara
+    console.log(`Haber kontrolü yapılıyor: "${title.substring(0, 30)}..." URL: ${sourceUrl}`);
+    
+    if (!sourceUrl) {
+      console.log('Kaynak URL boş, sadece başlığa göre kontrol yapılacak');
+      // URL yoksa başlığa göre ara
+      const searchResult = await newsService.searchNews(title.substring(0, 20));
+      
+      if (searchResult.error || !searchResult.data) {
+        return false;
+      }
+      
+      return searchResult.data.some(news => 
+        news.title.toLowerCase() === title.toLowerCase()
+      );
+    }
+    
+    // Doğrudan source_url'e göre sorgula - bu çok daha hızlı ve kesindir
+    console.log('Kaynak URL ile doğrudan kontrol ediliyor');
+    const result = await newsService.findBySourceUrl(sourceUrl);
+    
+    if (result.data) {
+      console.log(`URL ile eşleşen haber bulundu: ${sourceUrl} (ID: ${result.data.id})`);
+      return true;
+    }
+    
+    // URL ile bulunamazsa, başlığa göre ara
+    console.log('URL ile eşleşme bulunamadı, başlık kontrolü yapılıyor');
     const searchResult = await newsService.searchNews(title.substring(0, 20));
     
     if (searchResult.error || !searchResult.data) {
       return false;
     }
     
-    // Aynı başlık veya kaynak URL ile eşleşen haberi bul
-    return searchResult.data.some(news => 
-      news.title.toLowerCase() === title.toLowerCase() || 
-      news.source_url === sourceUrl
+    // Başlık eşleşmesi var mı kontrol et
+    const existsByTitle = searchResult.data.some(news => 
+      news.title.toLowerCase() === title.toLowerCase()
     );
+    
+    if (existsByTitle) {
+      console.log(`Başlık ile eşleşen haber bulundu: "${title.substring(0, 30)}..."`);
+    }
+    
+    return existsByTitle;
   } catch (error) {
     console.error('Haber kontrolü sırasında hata:', error);
     return false;

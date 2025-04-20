@@ -17,7 +17,8 @@
     "update:news": "ts-node src/scripts/updateNewsContent.ts",
     "scrape:sporx": "ts-node src/scripts/sporxScraper.ts",
     "scrape:news": "ts-node src/scripts/newsScraper.ts",
-    "scrape:all": "npm run scrape:konyaspor && npm run scrape:sporx && npm run scrape:news && npm run update:news"
+    "scrape:all": "npm run scrape:konyaspor && npm run scrape:sporx && npm run scrape:news && npm run update:news",
+    "scrape": "node src/scripts/newsScraper.ts"
   },
   "keywords": [
     "sportlink",

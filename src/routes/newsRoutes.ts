@@ -41,6 +41,10 @@ const newsController = new NewsController();
  *                 format: date-time
  *               sport_id:
  *                 type: string
+ *               status:
+ *                 type: integer
+ *                 description: 0=devre dışı, 1=aktif
+ *                 default: 0
  *     responses:
  *       201:
  *         description: News article created successfully
@@ -52,13 +56,15 @@ const newsController = new NewsController();
 router.post(
     '/',
     protect,
+    adminOnly,
     [
         body('title').notEmpty().withMessage('Title is required'),
         body('content').notEmpty().withMessage('Content is required'),
         body('sport_id').notEmpty().withMessage('Sport ID is required'),
         body('source_url').optional(),
         body('image_url').optional(),
-        body('published_date').optional()
+        body('published_date').optional(),
+        body('status').isInt({ min: 0, max: 1 }).optional()
     ],
     newsController.createNews
 );
@@ -99,6 +105,9 @@ router.post(
  *                 format: date-time
  *               sport_id:
  *                 type: string
+ *               status:
+ *                 type: integer
+ *                 description: 0=devre dışı, 1=aktif
  *     responses:
  *       200:
  *         description: News article updated successfully
@@ -112,6 +121,7 @@ router.post(
 router.put(
     '/:id',
     protect,
+    adminOnly,
     [
         body('title').optional(),
         body('content').optional(),
@@ -119,6 +129,7 @@ router.put(
         body('image_url').optional(),
         body('published_date').optional(),
         body('sport_id').optional(),
+        body('status').isInt({ min: 0, max: 1 }).optional(),
         validateRequest
     ],
     newsController.updateNews
@@ -148,7 +159,7 @@ router.put(
  *       404:
  *         description: News article not found
  */
-router.delete('/:id', protect, newsController.deleteNews);
+router.delete('/:id', protect, adminOnly, newsController.deleteNews);
 
 /**
  * @swagger
@@ -203,25 +214,32 @@ router.get('/recent', newsController.getRecentNews);
 
 /**
  * @swagger
- * /api/news/{id}:
+ * /api/news/active:
  *   get:
  *     tags:
  *       - News
- *     summary: Get a news article by ID
+ *     summary: Get active news articles (status=1)
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *         description: Page number
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *         description: Results per page
+ *       - in: query
+ *         name: sport_id
  *         schema:
  *           type: string
- *         description: News article ID
+ *         description: Filter by sport ID
  *     responses:
  *       200:
- *         description: News article retrieved successfully
- *       404:
- *         description: News article not found
+ *         description: List of active news articles
  */
-router.get('/:id', newsController.getNewsById);
+router.get('/active', newsController.getActiveNews);
 
 /**
  * @swagger
@@ -251,5 +269,27 @@ router.get('/:id', newsController.getNewsById);
  *         description: List of news articles
  */
 router.get('/', newsController.getNewsList);
+
+/**
+ * @swagger
+ * /api/news/{id}:
+ *   get:
+ *     tags:
+ *       - News
+ *     summary: Get a news article by ID
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: News article ID
+ *     responses:
+ *       200:
+ *         description: News article retrieved successfully
+ *       404:
+ *         description: News article not found
+ */
+router.get('/:id', newsController.getNewsById);
 
 export default router; 

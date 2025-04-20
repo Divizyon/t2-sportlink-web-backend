@@ -11,6 +11,7 @@ interface News {
     image_url: string;
     published_date: Date;
     sport_id: string;
+    status?: number;
     created_at?: string;
     updated_at?: string;
 }
@@ -21,24 +22,14 @@ export class NewsController {
      */
     async createNews(req: Request, res: Response): Promise<void> {
         try {
-            // Get admin ID from auth middleware
-            const adminId = (req as any).admin?.id;
-
-            if (!adminId) {
-                res.status(401).json({
-                    success: false,
-                    message: 'Authentication failed'
-                });
-                return;
-            }
-
             const newsData: Partial<News> = {
                 title: req.body.title,
                 content: req.body.content,
-                image_url: req.body.image || req.body.imageUrl,
+                image_url: req.body.image || req.body.imageUrl || req.body.image_url || "https://via.placeholder.com/800x400?text=No+Image",
                 published_date: req.body.publishDate || req.body.publishedAt || new Date(),
                 source_url: req.body.source_url || '',
-                sport_id: req.body.sport_id
+                sport_id: req.body.sport_id,
+                status: req.body.status !== undefined ? req.body.status : 0 // Varsayılan olarak devre dışı (0)
             };
 
             const result = await newsService.createNews(newsData);
@@ -84,10 +75,11 @@ export class NewsController {
             const newsData: Partial<News> = {
                 title: req.body.title,
                 content: req.body.content,
-                image_url: req.body.image || req.body.imageUrl,
+                image_url: req.body.image || req.body.imageUrl || req.body.image_url || existingNews.data.image_url,
                 published_date: req.body.publishDate || req.body.publishedAt,
                 source_url: req.body.source_url,
-                sport_id: req.body.sport_id
+                sport_id: req.body.sport_id,
+                status: req.body.status !== undefined ? req.body.status : existingNews.data.status // Mevcut değeri koru
             };
 
             const result = await newsService.updateNews(id, newsData);
@@ -247,6 +239,44 @@ export class NewsController {
             res.status(500).json({
                 success: false,
                 message: 'Error retrieving recent news',
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Get active news articles (status=1)
+     */
+    async getActiveNews(req: Request, res: Response): Promise<void> {
+        try {
+            const page = req.query.page ? parseInt(req.query.page as string) : 1;
+            const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+            const sport_id = req.query.sport_id as string | undefined;
+
+            const result = await newsService.getActiveNews(page, limit, sport_id);
+
+            if (result.error) {
+                res.status(400).json({
+                    success: false,
+                    message: result.error
+                });
+                return;
+            }
+
+            res.status(200).json({
+                success: true,
+                data: result.data,
+                meta: {
+                    total: result.count || 0,
+                    page,
+                    limit,
+                    totalPages: Math.ceil((result.count || 0) / limit)
+                }
+            });
+        } catch (error: any) {
+            res.status(500).json({
+                success: false,
+                message: 'Error retrieving active news',
                 error: error.message
             });
         }

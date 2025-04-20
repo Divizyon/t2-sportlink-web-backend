@@ -738,45 +738,49 @@ function formatUrl(url: string, baseUrl: string): string {
  */
 async function checkIfNewsExists(title: string, sourceUrl: string): Promise<boolean> {
   try {
-    // Önce kaynak URL'i kontrol et
-    const sourceResult = await newsService.listNews(1, 100);
-    if (!sourceResult.error && sourceResult.data) {
-      const exists = sourceResult.data.some(news => news.source_url === sourceUrl);
-      if (exists) {
-        return true;
+    console.log(`Haber kontrolü yapılıyor: "${title.substring(0, 30)}..." URL: ${sourceUrl}`);
+    
+    if (!sourceUrl) {
+      console.log('Kaynak URL boş, sadece başlığa göre kontrol yapılacak');
+      // URL yoksa başlığa göre ara
+      const searchResult = await newsService.searchNews(title.substring(0, 20));
+      
+      if (searchResult.error || !searchResult.data) {
+        return false;
       }
+      
+      return searchResult.data.some(news => 
+        news.title.toLowerCase() === title.toLowerCase()
+      );
     }
     
-    // Hiçbir sonuç bulunamazsa veya URL eşleşmezse, başlıkla kontrol et
-    // Başlıktaki özel karakterleri temizle
-    const searchTerm = title
-                      .substring(0, 20)
-                      .replace(/%/g, '')
-                      .replace(/:/g, '')
-                      .trim();
+    // Doğrudan source_url'e göre sorgula - bu çok daha hızlı ve kesindir
+    console.log('Kaynak URL ile doğrudan kontrol ediliyor');
+    const result = await newsService.findBySourceUrl(sourceUrl);
     
-    if (searchTerm.length < 3) {
-      // Çok kısa terimlerle arama yapmak yerine, başlığın tamamını kontrol et
-      return sourceResult.data ? sourceResult.data.some(news => 
-        news.title.toLowerCase() === title.toLowerCase() ||
-        title.toLowerCase().includes(news.title.toLowerCase()) ||
-        news.title.toLowerCase().includes(title.toLowerCase())
-      ) : false;
+    if (result.data) {
+      console.log(`URL ile eşleşen haber bulundu: ${sourceUrl} (ID: ${result.data.id})`);
+      return true;
     }
     
-    // Başlık ile haberi ara
-    const searchResult = await newsService.searchNews(searchTerm);
+    // URL ile bulunamazsa, başlığa göre ara
+    console.log('URL ile eşleşme bulunamadı, başlık kontrolü yapılıyor');
+    const searchResult = await newsService.searchNews(title.substring(0, 20));
     
     if (searchResult.error || !searchResult.data) {
-      console.log(`Başlık araması yapılamadı: ${searchTerm}`);
       return false;
     }
     
-    // Aynı başlık ile eşleşen haberi bul
-    return searchResult.data.some(news => 
-      news.title.toLowerCase().includes(title.toLowerCase()) || 
-      title.toLowerCase().includes(news.title.toLowerCase())
+    // Başlık eşleşmesi var mı kontrol et
+    const existsByTitle = searchResult.data.some(news => 
+      news.title.toLowerCase() === title.toLowerCase()
     );
+    
+    if (existsByTitle) {
+      console.log(`Başlık ile eşleşen haber bulundu: "${title.substring(0, 30)}..."`);
+    }
+    
+    return existsByTitle;
   } catch (error) {
     console.error('Haber kontrolü sırasında hata:', error);
     return false;
