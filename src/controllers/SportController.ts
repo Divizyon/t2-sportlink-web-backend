@@ -62,7 +62,18 @@ export class SportController {
      */
     async getAllSports(req: Request, res: Response) {
         try {
-            const { data, error } = await this.sportService.getAllSports();
+            // Desteklenen filtreleme seçenekleri
+            const { name, sortBy, order } = req.query;
+            
+            // Filtreleri service'e iletmek için hazırla
+            const filters = {
+                ...(name && { name: String(name) }),
+                sortBy: sortBy ? String(sortBy) : 'name',
+                order: order === 'desc' ? 'desc' : 'asc' as 'asc' | 'desc'  // Tür dönüşümü
+            };
+
+            // Filtreleri kullanarak sporları getir
+            const { data, error } = await this.sportService.getAllSports(filters);
 
             if (error) {
                 return res.status(400).json({

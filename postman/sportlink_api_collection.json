@@ -1,0 +1,391 @@
+{
+	"info": {
+		"_postman_id": "da5b2f18-e8c9-4b14-8954-a0e79ba4f212",
+		"name": "Sportlink API",
+		"description": "Sportlink API'si için test koleksiyonu. Bu koleksiyon, kullanıcı kimlik doğrulama ve spor kategorileri yönetimi için gerekli tüm endpointleri içerir.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Login",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData.token) {",
+									"    pm.environment.set('token', jsonData.token);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{admin_email}}\",\n    \"password\": \"{{admin_password}}\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/login",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						},
+						"description": "Kullanıcı girişi. Başarılı girişten sonra token alınır ve otomatik olarak environment değişkenlerine kaydedilir."
+					},
+					"response": []
+				},
+				{
+					"name": "Register",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"username\": \"newuser\",\n    \"email\": \"newuser@example.com\",\n    \"password\": \"password123\",\n    \"first_name\": \"New\",\n    \"last_name\": \"User\",\n    \"phone\": \"+901234567890\",\n    \"profile_picture\": \"https://example.com/profile.jpg\",\n    \"default_location_latitude\": 41.0082,\n    \"default_location_longitude\": 28.9784\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/register",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"register"
+							]
+						},
+						"description": "Yeni kullanıcı kaydı."
+					},
+					"response": []
+				},
+				{
+					"name": "Logout",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/auth/logout",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"logout"
+							]
+						},
+						"description": "Kullanıcı çıkışı."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Sports",
+			"item": [
+				{
+					"name": "Get All Sports",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/sports",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"sports"
+							],
+							"query": [
+								{
+									"key": "name",
+									"value": "futbol",
+									"description": "İsme göre filtreleme (opsiyonel)",
+									"disabled": true
+								},
+								{
+									"key": "sortBy",
+									"value": "name",
+									"description": "Sıralama alanı: name, description, vb. (opsiyonel)",
+									"disabled": true
+								},
+								{
+									"key": "order",
+									"value": "asc",
+									"description": "Sıralama yönü: asc veya desc (opsiyonel)",
+									"disabled": true
+								}
+							]
+						},
+						"description": "Tüm spor kategorilerini getir. Filtreleme ve sıralama için query parametreleri kullanılabilir."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Sport by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/sports/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"sports",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1"
+								}
+							]
+						},
+						"description": "ID'ye göre spor kategorisi getir. Path parametresi olarak ID değeri verilmelidir."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Sport",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Basketbol\",\n    \"description\": \"Basketbol, iki takım arasında oynanan, her takımda beş oyuncu bulunması gereken, rakip takımın potasına topu sokarak sayı kazanmaya dayalı bir spor.\",\n    \"icon\": \"https://example.com/icons/basketball.png\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/sports",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"sports"
+							]
+						},
+						"description": "Yeni bir spor kategorisi oluştur. Admin yetkisi gereklidir."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Sport",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Basketbol\",\n    \"description\": \"Güncellenmiş basketbol açıklaması\",\n    \"icon\": \"https://example.com/icons/basketball_updated.png\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/sports/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"sports",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1"
+								}
+							]
+						},
+						"description": "Bir spor kategorisini güncelle. Admin yetkisi gereklidir."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Sport",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{token}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/sports/:id",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"sports",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "1"
+								}
+							]
+						},
+						"description": "Bir spor kategorisini sil. Admin yetkisi gereklidir. Eğer kategoriye bağlı etkinlikler varsa silme işlemi engellenir."
+					},
+					"response": []
+				},
+				{
+					"name": "Search Sports by Name",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/sports?name=futbol",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"sports"
+							],
+							"query": [
+								{
+									"key": "name",
+									"value": "futbol"
+								}
+							]
+						},
+						"description": "İsme göre spor kategorilerini ara. Case-insensitive arama yapar."
+					},
+					"response": []
+				},
+				{
+					"name": "Get All Sports - Sort by Name Desc",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/api/sports?sortBy=name&order=desc",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"sports"
+							],
+							"query": [
+								{
+									"key": "sortBy",
+									"value": "name"
+								},
+								{
+									"key": "order",
+									"value": "desc"
+								}
+							]
+						},
+						"description": "Tüm spor kategorilerini isme göre azalan sırada getir."
+					},
+					"response": []
+				}
+			],
+			"description": "Spor kategorileri ile ilgili API endpointleri."
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{token}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	]
+} 

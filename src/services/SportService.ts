@@ -1,8 +1,15 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { Sport, CreateSportDTO, UpdateSportDTO } from '../models/Sport';
 
 // Prisma istemcisi oluştur
 const prisma = new PrismaClient();
+
+// Filtreleme için parametre tipi
+interface SportFilters {
+    name?: string;
+    sortBy?: string;
+    order?: 'asc' | 'desc';
+}
 
 export class SportService {
     /**
@@ -40,12 +47,36 @@ export class SportService {
     }
 
     /**
-     * Get all sports
+     * Get all sports with optional filtering, sorting, and searching
      */
-    async getAllSports() {
+    async getAllSports(filters?: SportFilters) {
         try {
-            // Tüm spor türlerini getir
-            const sports = await prisma.sports.findMany();
+            console.log('Getting sports with filters:', filters);
+            
+            // Varsayılan filtre değerleri
+            const { name, sortBy = 'name', order = 'asc' } = filters || {};
+            
+            // Sorgu koşulları
+            let where: Prisma.SportsWhereInput = {};
+            
+            // İsim filtresi varsa ekle
+            if (name) {
+                where.name = {
+                    contains: name,
+                    mode: Prisma.QueryMode.insensitive // Doğru enum değeri
+                };
+            }
+            
+            // Sıralama için orderBy
+            const orderBy: any = {
+                [sortBy]: order
+            };
+            
+            // Tüm spor türlerini filtrelerle getir
+            const sports = await prisma.sports.findMany({
+                where,
+                orderBy
+            });
 
             // BigInt'leri string'e dönüştür
             const formattedSports = sports.map((sport: any) => ({
