@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { SportService } from '../services/SportService';
+import { CreateSportDTO, UpdateSportDTO } from '../models/Sport';
 
 export class SportController {
     private sportService: SportService;
@@ -9,184 +10,129 @@ export class SportController {
     }
 
     /**
-     * Create a new sport
-     */
-    async createSport(req: Request, res: Response) {
-        try {
-            console.log('Received create sport request:', req.body);
-            
-            const { name, description, icon } = req.body;
-
-            // Validate required fields
-            if (!name || !description || !icon) {
-                console.log('Missing required fields:', { name, description, icon });
-                return res.status(400).json({
-                    success: false,
-                    message: 'Missing required fields',
-                });
-            }
-
-            // Create sport
-            const { data, error } = await this.sportService.createSport({
-                name,
-                description,
-                icon
-            });
-
-            if (error) {
-                console.error('Error in createSport call:', error);
-                return res.status(400).json({
-                    success: false,
-                    message: error,
-                });
-            }
-
-            console.log('Sport created successfully:', data);
-            return res.status(201).json({
-                success: true,
-                message: 'Sport created successfully',
-                data,
-            });
-        } catch (error: any) {
-            console.error('Error in createSport controller:', error);
-            return res.status(500).json({
-                success: false,
-                message: 'Failed to create sport',
-                error: error.message,
-            });
-        }
-    }
-
-    /**
-     * Get all sports
+     * Tüm sporları getir
      */
     async getAllSports(req: Request, res: Response) {
         try {
-            const { data, error } = await this.sportService.getAllSports();
+            const filters = {
+                name: req.query.name as string,
+                sortBy: req.query.sortBy as string,
+                order: req.query.order as 'asc' | 'desc'
+            };
+
+            const { data, error } = await this.sportService.getAllSports(filters);
 
             if (error) {
-                return res.status(400).json({
-                    success: false,
-                    message: error,
-                });
+                return res.status(400).json({ success: false, error });
             }
 
-            return res.status(200).json({
-                success: true,
-                data,
-            });
+            return res.status(200).json({ success: true, data });
         } catch (error: any) {
-            console.error('Error in getAllSports controller:', error);
-            return res.status(500).json({
-                success: false,
-                message: 'Failed to retrieve sports',
-                error: error.message,
+            console.error('Controller Error - getAllSports:', error);
+            return res.status(500).json({ 
+                success: false, 
+                error: 'Sporlar getirilirken bir hata oluştu' 
             });
         }
     }
 
     /**
-     * Get sport by ID
+     * ID'ye göre sporu getir
      */
     async getSportById(req: Request, res: Response) {
         try {
-            const { id } = req.params;
-
+            const id = req.params.id;
+            
             const { data, error } = await this.sportService.getSportById(id);
 
-            if (error || !data) {
-                return res.status(404).json({
-                    success: false,
-                    message: error || 'Sport not found',
-                });
+            if (error) {
+                return res.status(404).json({ success: false, error });
             }
 
-            return res.status(200).json({
-                success: true,
-                data,
-            });
+            return res.status(200).json({ success: true, data });
         } catch (error: any) {
-            console.error('Error in getSportById controller:', error);
-            return res.status(500).json({
-                success: false,
-                message: 'Failed to retrieve sport',
-                error: error.message,
+            console.error('Controller Error - getSportById:', error);
+            return res.status(500).json({ 
+                success: false, 
+                error: 'Spor getirilirken bir hata oluştu' 
             });
         }
     }
 
     /**
-     * Update sport
+     * Yeni spor oluştur
+     */
+    async createSport(req: Request, res: Response) {
+        try {
+            const sportData: CreateSportDTO = {
+                name: req.body.name,
+                description: req.body.description,
+                icon: req.body.icon
+            };
+
+            const { data, error } = await this.sportService.createSport(sportData);
+
+            if (error) {
+                return res.status(400).json({ success: false, error });
+            }
+
+            return res.status(201).json({ success: true, data });
+        } catch (error: any) {
+            console.error('Controller Error - createSport:', error);
+            return res.status(500).json({ 
+                success: false, 
+                error: 'Spor oluşturulurken bir hata oluştu' 
+            });
+        }
+    }
+
+    /**
+     * Sporu güncelle
      */
     async updateSport(req: Request, res: Response) {
         try {
-            const { id } = req.params;
-            const { name, description, icon } = req.body;
+            const id = req.params.id;
+            const updateData: UpdateSportDTO = req.body;
 
-            // Validate if any field provided
-            if (!name && !description && !icon) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'No update fields provided',
-                });
-            }
-
-            // Update sport
-            const { data, error } = await this.sportService.updateSport(id, {
-                ...(name && { name }),
-                ...(description && { description }),
-                ...(icon && { icon }),
-            });
+            const { data, error } = await this.sportService.updateSport(id, updateData);
 
             if (error) {
-                return res.status(400).json({
-                    success: false,
-                    message: error,
-                });
+                return res.status(400).json({ success: false, error });
             }
 
-            return res.status(200).json({
-                success: true,
-                message: 'Sport updated successfully',
-                data,
-            });
+            return res.status(200).json({ success: true, data });
         } catch (error: any) {
-            console.error('Error in updateSport controller:', error);
-            return res.status(500).json({
-                success: false,
-                message: 'Failed to update sport',
-                error: error.message,
+            console.error('Controller Error - updateSport:', error);
+            return res.status(500).json({ 
+                success: false, 
+                error: 'Spor güncellenirken bir hata oluştu' 
             });
         }
     }
 
     /**
-     * Delete sport
+     * Sporu sil
      */
     async deleteSport(req: Request, res: Response) {
         try {
-            const { id } = req.params;
-
+            const id = req.params.id;
+            
             const { success, error } = await this.sportService.deleteSport(id);
 
             if (!success) {
-                return res.status(400).json({
-                    success: false,
-                    message: error || 'Failed to delete sport',
-                });
+                return res.status(400).json({ success: false, error });
             }
 
-            return res.status(200).json({
-                success: true,
-                message: 'Sport deleted successfully',
+            return res.status(200).json({ 
+                success: true, 
+                message: 'Spor başarıyla silindi' 
             });
         } catch (error: any) {
-            console.error('Error in deleteSport controller:', error);
-            return res.status(500).json({
-                success: false,
-                message: 'Failed to delete sport',
-                error: error.message,
+            console.error('Controller Error - deleteSport:', error);
+            return res.status(500).json({ 
+                success: false, 
+                error: 'Spor silinirken bir hata oluştu' 
             });
         }
     }
-} 
+}

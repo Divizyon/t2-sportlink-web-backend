@@ -1,4 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
+import prisma from './config/prisma';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -39,7 +40,7 @@ app.use('/api/announcements', announcementRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/sports', sportRoutes);
-
+app.use('/api/admin', adminRoutes);
 // Ana sayfa
 app.get('/', (req: Request, res: Response) => {
     res.json({

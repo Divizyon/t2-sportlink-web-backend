@@ -4,13 +4,41 @@ import bcrypt from 'bcrypt';
 
 export const findUserById = async (id: bigint) => {
   return prisma.users.findUnique({
-    where: { id }
+    where: { id },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      first_name: true,
+      last_name: true,
+      role: true,
+      phone: true,
+      profile_picture: true,
+      default_location_latitude: true,
+      default_location_longitude: true,
+      created_at: true,
+      updated_at: true
+    }
   });
 };
 
 export const findUserByEmail = async (email: string) => {
   return prisma.users.findFirst({
-    where: { email }
+    where: { email },
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      first_name: true,
+      last_name: true,
+      role: true,
+      phone: true,
+      profile_picture: true,
+      default_location_latitude: true,
+      default_location_longitude: true,
+      created_at: true,
+      updated_at: true
+    }
   });
 };
 
