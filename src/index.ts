@@ -5,7 +5,6 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import userRoutes from './routes/userRoutes';
-import exampleRoutes from './routes/exampleRoutes';
 import eventRoutes from './routes/eventRoutes';
 import authRoutes from './routes/authRoutes';
 import profileRoutes from './routes/profileRoutes';
