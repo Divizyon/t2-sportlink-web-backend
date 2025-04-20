@@ -2,10 +2,84 @@ import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { UserRole } from '../types/user';
+import { AdminService } from '../services/AdminService';
 
 const prisma = new PrismaClient();
 
 class AdminController {
+    private adminService: AdminService;
+
+    constructor() {
+        this.adminService = new AdminService();
+    }
+
+    /**
+     * Admin kullanıcının kendi profilini güncellemesi
+     */
+    async updateProfile(req: Request, res: Response) {
+        try {
+            // Kullanıcı kimliğini al
+            const userId = req.user?.userId;
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Oturum açmanız gerekiyor'
+                });
+            }
+
+            // Gönderilen verileri al
+            const { email, first_name, last_name, phone, profile_picture } = req.body;
+            
+            // En az bir alanın güncellenip güncellenmediğini kontrol et
+            if (!email && !first_name && !last_name && !phone && !profile_picture) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Güncellenecek en az bir alan belirtilmelidir'
+                });
+            }
+
+            // Email formatını doğrula
+            if (email && !email.includes('@')) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Geçerli bir email adresi girin'
+                });
+            }
+
+            // Service'i çağır
+            const { success, error, data } = await this.adminService.updateAdminProfile(
+                BigInt(userId),
+                {
+                    email,
+                    first_name,
+                    last_name,
+                    phone,
+                    profile_picture
+                }
+            );
+
+            if (!success) {
+                return res.status(400).json({
+                    success: false,
+                    message: error
+                });
+            }
+
+            return res.status(200).json({
+                success: true,
+                message: 'Profil başarıyla güncellendi',
+                data
+            });
+        } catch (error: any) {
+            console.error('Profil güncellenirken hata:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Profil güncelleme işlemi başarısız oldu',
+                error: error.message
+            });
+        }
+    }
+
     /**
      * Tüm kullanıcıları listeler (sayfalama ile)
      */
