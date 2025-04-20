@@ -412,4 +412,77 @@ router.post('/users', authenticate, restrictTo('admin', 'superadmin'), adminCont
  */
 router.delete('/users/:id', authenticate, restrictTo('admin', 'superadmin'), adminController.deleteUser);
 
+/**
+ * @swagger
+ * /api/admin/profile:
+ *   put:
+ *     summary: Admin profilini güncelleme
+ *     tags: [Admin]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 description: Admin email adresi
+ *               first_name:
+ *                 type: string
+ *                 description: Admin adı
+ *               last_name:
+ *                 type: string
+ *                 description: Admin soyadı
+ *               phone:
+ *                 type: string
+ *                 description: Admin telefon numarası
+ *               profile_picture:
+ *                 type: string
+ *                 description: Admin profil resmi URL'i
+ *     responses:
+ *       200:
+ *         description: Profil başarıyla güncellendi
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Profil başarıyla güncellendi
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     username:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     first_name:
+ *                       type: string
+ *                     last_name:
+ *                       type: string
+ *                     phone:
+ *                       type: string
+ *                     profile_picture:
+ *                       type: string
+ *                     role:
+ *                       type: string
+ *       400:
+ *         description: Geçersiz istek 
+ *       401:
+ *         description: Yetkilendirme hatası
+ *       500:
+ *         description: Sunucu hatası
+ */
+router.put('/profile', authenticate, restrictTo('admin', 'superadmin'), adminController.updateProfile);
+
 export default router; 
