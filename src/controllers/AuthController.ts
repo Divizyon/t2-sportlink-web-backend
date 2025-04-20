@@ -51,15 +51,6 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
         const result = await authService.login(loginData);
         
         if (result.error) {
-            // Email doğrulama hatası kontrolü
-            if (result.error.includes('Email adresinizi doğrulamanız gerekmektedir')) {
-                return res.status(403).json({ 
-                    error: result.error,
-                    needsEmailVerification: true,
-                    email: loginData.email
-                });
-            }
-            
             return res.status(401).json({ error: result.error });
         }
         
