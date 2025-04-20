@@ -16,10 +16,10 @@ export class EventService {
     async createEvent(data: CreateEventDTO) {
         try {
             console.log('Creating event with data:', JSON.stringify(data, null, 2));
-            
+
             // Generate slug from title
-            let eventData: any = {...data};
-            
+            let eventData: any = { ...data };
+
             if (data.title) {
                 eventData.slug = generateSlug(data.title);
             }
@@ -39,7 +39,8 @@ export class EventService {
                     location_latitude: data.location_latitude,
                     location_longitude: data.location_longitude,
                     max_participants: data.max_participants,
-                    status: data.status || 'active',
+                    status: 'active', // Event is initially active but needs approval
+                    approval_status: 'pending', // Event requires admin approval
                     creator_id: data.creator_id,
                     sport_id: data.sport_id,
                     created_at: now,
@@ -69,8 +70,8 @@ export class EventService {
     async updateEvent(id: string, data: UpdateEventDTO) {
         try {
             // Generate new slug if title changes
-            let eventData: any = {...data};
-            
+            let eventData: any = { ...data };
+
             if (data.title) {
                 eventData.slug = generateSlug(data.title);
             }
@@ -165,7 +166,7 @@ export class EventService {
             }
 
             // İlişkileri olan event verisini düzgün şekilde dönüştürüp döndür
-            return { 
+            return {
                 data: {
                     ...event,
                     id: event.id.toString(),
@@ -191,8 +192,8 @@ export class EventService {
                             profile_image: p.user.profile_picture
                         } : null
                     }))
-                }, 
-                error: null 
+                },
+                error: null
             };
         } catch (error: any) {
             console.error('Unexpected error in findEventById service:', error);
@@ -249,7 +250,7 @@ export class EventService {
             }
 
             // İlişkileri olan event verisini düzgün şekilde dönüştürüp döndür
-            return { 
+            return {
                 data: {
                     ...event,
                     id: event.id.toString(),
@@ -275,8 +276,8 @@ export class EventService {
                             profile_image: p.user.profile_picture
                         } : null
                     }))
-                }, 
-                error: null 
+                },
+                error: null
             };
         } catch (error: any) {
             console.error('Unexpected error in findEventBySlug service:', error);
@@ -285,7 +286,7 @@ export class EventService {
     }
 
     /**
-     * List events with pagination using Prisma
+     * List events with pagination
      */
     async listEvents(page: number, limit: number, activeOnly: boolean) {
         try {
@@ -293,7 +294,11 @@ export class EventService {
             const skip = (page - 1) * limit;
 
             // Filtreleme koşullarını oluştur
-            const where = activeOnly ? { status: 'active' } : {};
+            const where = activeOnly ?
+                {
+                    status: 'active',
+                    approval_status: 'approved'  // Only show approved events
+                } : {};
 
             // Prisma ile verileri sorgula
             const events = await prisma.events.findMany({
@@ -366,6 +371,7 @@ export class EventService {
             const events = await prisma.events.findMany({
                 where: {
                     status: 'active',
+                    approval_status: 'approved',
                     event_date: {
                         gte: today
                     }
@@ -429,7 +435,7 @@ export class EventService {
     async joinEvent(eventId: string, userId: string, role: string = 'participant') {
         try {
             console.log(`User ${userId} attempting to join event ${eventId}`);
-            
+
             // Check if user already joined
             const existingParticipant = await prisma.event_Participants.findUnique({
                 where: {
@@ -458,6 +464,18 @@ export class EventService {
             if (!event) {
                 console.log(`Event ${eventId} not found`);
                 return { success: false, error: 'Event not found' };
+            }
+
+            // Check if event is approved
+            if (event.approval_status !== 'approved') {
+                console.log(`Event ${eventId} is not approved. Current status: ${event.approval_status}`);
+                return { success: false, error: 'This event is not available for joining yet' };
+            }
+
+            // Check if event is active
+            if (event.status !== 'active') {
+                console.log(`Event ${eventId} is not active. Current status: ${event.status}`);
+                return { success: false, error: 'This event is not available for joining' };
             }
 
             if (event.max_participants > 0 && event.participants.length >= event.max_participants) {
@@ -489,7 +507,7 @@ export class EventService {
     async leaveEvent(eventId: string, userId: string) {
         try {
             console.log(`User ${userId} attempting to leave event ${eventId}`);
-            
+
             // Check if user is a participant
             const participant = await prisma.event_Participants.findUnique({
                 where: {
@@ -520,6 +538,232 @@ export class EventService {
         } catch (error: any) {
             console.error(`Error in leaveEvent service: ${error.message}`, error);
             return { success: false, error: error.message || 'Failed to leave event' };
+        }
+    }
+
+    /**
+     * Get all pending events that need admin approval
+     */
+    async getPendingEvents(page: number = 1, limit: number = 10) {
+        try {
+            const offset = (page - 1) * limit;
+
+            // Fetch events with approval_status = 'pending'
+            const pendingEvents = await prisma.events.findMany({
+                where: {
+                    approval_status: 'pending'
+                },
+                include: {
+                    creator: {
+                        select: {
+                            id: true,
+                            username: true,
+                            profile_picture: true
+                        }
+                    },
+                    sport: {
+                        select: {
+                            id: true,
+                            name: true,
+                            icon: true
+                        }
+                    }
+                },
+                orderBy: {
+                    created_at: 'desc'
+                },
+                skip: offset,
+                take: limit
+            });
+
+            // Get total count of pending events
+            const totalCount = await prisma.events.count({
+                where: {
+                    approval_status: 'pending'
+                }
+            });
+
+            // Format events for response
+            const formattedEvents = pendingEvents.map((event: any) => ({
+                ...event,
+                id: event.id.toString(),
+                creator_id: event.creator_id.toString(),
+                sport_id: event.sport_id.toString(),
+                creator: {
+                    id: event.creator.id.toString(),
+                    username: event.creator.username,
+                    profile_image: event.creator.profile_picture
+                },
+                sport: {
+                    id: event.sport.id.toString(),
+                    name: event.sport.name,
+                    icon: event.sport.icon
+                }
+            }));
+
+            return {
+                data: {
+                    events: formattedEvents,
+                    pagination: {
+                        total: totalCount,
+                        page,
+                        limit,
+                        pages: Math.ceil(totalCount / limit)
+                    }
+                },
+                error: null
+            };
+        } catch (error: any) {
+            console.error('Error in getPendingEvents service:', error);
+            return { error: error.message || 'Failed to get pending events', data: null };
+        }
+    }
+
+    /**
+     * Approve an event by admin
+     */
+    async approveEvent(id: string, adminId: string) {
+        try {
+            // Check if event exists
+            const event = await prisma.events.findUnique({
+                where: { id: BigInt(id) }
+            });
+
+            if (!event) {
+                return { success: false, error: 'Event not found' };
+            }
+
+            // Check if event is already approved or rejected
+            if (event.approval_status !== 'pending') {
+                return {
+                    success: false,
+                    error: `Event is already ${event.approval_status}`
+                };
+            }
+
+            // Update event approval status
+            await prisma.events.update({
+                where: { id: BigInt(id) },
+                data: {
+                    approval_status: 'approved',
+                    updated_at: new Date()
+                }
+            });
+
+            // Log admin action
+            await prisma.admin_Logs.create({
+                data: {
+                    admin_id: BigInt(adminId),
+                    action_type: 'approve_event',
+                    description: `Approved event #${id}`,
+                    created_at: new Date()
+                }
+            });
+
+            return { success: true, error: null };
+        } catch (error: any) {
+            console.error('Error in approveEvent service:', error);
+            return { success: false, error: error.message || 'Failed to approve event' };
+        }
+    }
+
+    /**
+     * Reject an event by admin
+     */
+    async rejectEvent(id: string, adminId: string, reason: string = '') {
+        try {
+            // Check if event exists
+            const event = await prisma.events.findUnique({
+                where: { id: BigInt(id) }
+            });
+
+            if (!event) {
+                return { success: false, error: 'Event not found' };
+            }
+
+            // Check if event is already approved or rejected
+            if (event.approval_status !== 'pending') {
+                return {
+                    success: false,
+                    error: `Event is already ${event.approval_status}`
+                };
+            }
+
+            // Update event status and approval status
+            await prisma.events.update({
+                where: { id: BigInt(id) },
+                data: {
+                    approval_status: 'rejected',
+                    status: 'inactive',
+                    updated_at: new Date()
+                }
+            });
+
+            // Log admin action
+            await prisma.admin_Logs.create({
+                data: {
+                    admin_id: BigInt(adminId),
+                    action_type: 'reject_event',
+                    description: `Rejected event #${id}${reason ? `: ${reason}` : ''}`,
+                    created_at: new Date()
+                }
+            });
+
+            return { success: true, error: null };
+        } catch (error: any) {
+            console.error('Error in rejectEvent service:', error);
+            return { success: false, error: error.message || 'Failed to reject event' };
+        }
+    }
+
+    /**
+     * Check and update expired pending events
+     * This can be run on a schedule (e.g., once a day)
+     */
+    async updateExpiredPendingEvents() {
+        try {
+            const today = new Date();
+
+            // Find pending events with past event dates
+            const expiredEvents = await prisma.events.findMany({
+                where: {
+                    approval_status: 'pending',
+                    event_date: {
+                        lt: today
+                    }
+                }
+            });
+
+            if (expiredEvents.length === 0) {
+                return { success: true, count: 0, error: null };
+            }
+
+            // Update expired events to inactive
+            await prisma.events.updateMany({
+                where: {
+                    approval_status: 'pending',
+                    event_date: {
+                        lt: today
+                    }
+                },
+                data: {
+                    status: 'inactive',
+                    updated_at: today
+                }
+            });
+
+            return {
+                success: true,
+                count: expiredEvents.length,
+                error: null
+            };
+        } catch (error: any) {
+            console.error('Error in updateExpiredPendingEvents service:', error);
+            return {
+                success: false,
+                count: 0,
+                error: error.message || 'Failed to update expired pending events'
+            };
         }
     }
 } 

@@ -25,6 +25,7 @@
   "dependencies": {
     "@prisma/client": "^6.6.0",
     "@supabase/supabase-js": "^2.39.7",
+    "@types/node-cron": "^3.0.11",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
     "bcrypt": "^5.1.1",
@@ -35,6 +36,7 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "node-cron": "^3.0.3",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   },

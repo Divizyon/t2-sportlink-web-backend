@@ -13,7 +13,8 @@ export interface Event {
   location_latitude: number;
   location_longitude: number;
   max_participants: number;
-  status: string;
+  status: string; // active, inactive
+  approval_status: string; // pending, approved, rejected
   created_at: Date;
   updated_at: Date;
 }
@@ -31,6 +32,7 @@ export interface CreateEventDTO {
   location_longitude: number;
   max_participants: number;
   status: string;
+  approval_status: string;
 }
 
 export interface UpdateEventDTO {
@@ -44,4 +46,5 @@ export interface UpdateEventDTO {
   location_longitude?: number;
   max_participants?: number;
   status?: string;
+  approval_status?: string;
 } 
