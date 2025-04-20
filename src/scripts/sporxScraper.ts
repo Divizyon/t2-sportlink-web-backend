@@ -56,8 +56,9 @@ export async function scrapeSporx() {
           const newsUrl = formatUrl(newsLinks[i], category.url);
           
           try {
-            // Haberi kontrol et
-            const existingNews = await checkIfNewsExists(newsUrl);
+            // Haber için URL'ler zaten işlendi mi kontrol et
+            const title = $(newsLinks[i]).text().trim();
+            const existingNews = await checkIfNewsExists(title, newsUrl);
             if (existingNews) {
               console.log(`Haber zaten mevcut: ${newsUrl}`);
               continue;
@@ -74,7 +75,7 @@ export async function scrapeSporx() {
             const newsPage = cheerio.load(newsResponse.data);
             
             // Haber verilerini çıkar (Sporx sitesine özel CSS seçicileri - güncellemeniz gerekebilir)
-            const title = newsPage('.news-detail h1, .article-title h1, .story-title, .content-title, h1.title').text().trim();
+            const detailTitle = newsPage('.news-detail h1, .article-title h1, .story-title, .content-title, h1.title').text().trim();
             const content = newsPage('.news-detail .news-content, .article-body, .story-content, .content-text, .article-text').text().trim();
             const imageUrl = newsPage('.news-detail .news-img img, .article-img img, .story-image img, .content-image img, article figure img').attr('src') || '';
             
@@ -108,9 +109,9 @@ export async function scrapeSporx() {
             }
             
             // Yeterli veri varsa haberi kaydet
-            if (title && content) {
+            if (detailTitle && content) {
               const newsData = {
-                title,
+                title: detailTitle,
                 content: content.substring(0, 5000),
                 source_url: newsUrl,
                 image_url: formatUrl(imageUrl, category.url),
@@ -118,7 +119,7 @@ export async function scrapeSporx() {
                 sport_id: category.sportId
               };
               
-              console.log(`Haber ekleniyor: ${title}`);
+              console.log(`Haber ekleniyor: ${detailTitle}`);
               const result = await newsService.createNews(newsData);
               
               if (result.error) {
@@ -196,17 +197,55 @@ function formatUrl(url: string, baseUrl: string): string {
 /**
  * Haberin daha önce eklenip eklenmediğini kontrol eder
  */
-async function checkIfNewsExists(sourceUrl: string): Promise<boolean> {
+async function checkIfNewsExists(title: string, sourceUrl: string): Promise<boolean> {
   try {
-    // Tüm haberleri çek ve source_url'e göre kontrol et
+    console.log(`Haber kontrolü yapılıyor: "${title.substring(0, 30)}..." URL: ${sourceUrl}`);
+    
+    if (!sourceUrl) {
+      console.log('Kaynak URL boş, sadece başlığa göre kontrol yapılacak');
+      // URL yoksa başlığa göre ara
+      const searchResult = await newsService.searchNews(title.substring(0, 20));
+      
+      if (searchResult.error || !searchResult.data) {
+        return false;
+      }
+      
+      return searchResult.data.some(news => 
+        news.title.toLowerCase() === title.toLowerCase()
+      );
+    }
+    
+    // Öncelikle source_url'e göre kontrol et - bu daha hızlıdır
+    console.log('Kaynak URL ile kontrol ediliyor');
     const result = await newsService.listNews(1, 100);
     
-    if (result.error || !result.data) {
+    if (!result.error && result.data) {
+      // Aynı source_url'e sahip haber var mı kontrol et
+      const existsByUrl = result.data.some(news => news.source_url === sourceUrl);
+      if (existsByUrl) {
+        console.log(`URL ile eşleşen haber bulundu: ${sourceUrl}`);
+        return true;
+      }
+    }
+    
+    // URL ile bulunamazsa, başlığa göre ara
+    console.log('URL ile eşleşme bulunamadı, başlık kontrolü yapılıyor');
+    const searchResult = await newsService.searchNews(title.substring(0, 20));
+    
+    if (searchResult.error || !searchResult.data) {
       return false;
     }
     
-    // Aynı kaynak URL'e sahip haberi bul
-    return result.data.some(news => news.source_url === sourceUrl);
+    // Başlık eşleşmesi var mı kontrol et
+    const existsByTitle = searchResult.data.some(news => 
+      news.title.toLowerCase() === title.toLowerCase()
+    );
+    
+    if (existsByTitle) {
+      console.log(`Başlık ile eşleşen haber bulundu: "${title.substring(0, 30)}..."`);
+    }
+    
+    return existsByTitle;
   } catch (error) {
     console.error('Haber kontrolü sırasında hata:', error);
     return false;

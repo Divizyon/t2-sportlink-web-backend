@@ -9,6 +9,7 @@ interface News {
     image_url: string;
     published_date: Date;
     sport_id: string;
+    status?: number;
     created_at?: string;
     updated_at?: string;
 }
@@ -21,6 +22,17 @@ export class NewsService {
      */
     async createNews(data: Partial<News>) {
         try {
+            // İçeriğin kelime sayısını kontrol et
+            if (data.content) {
+                const wordCount = data.content.trim().split(/\s+/).length;
+                if (wordCount < 10) {
+                    return { 
+                        error: 'İçerik en az 10 kelime olmalıdır', 
+                        data: null 
+                    };
+                }
+            }
+
             // Set timestamps
             const now = new Date().toISOString();
             data.created_at = now;
@@ -50,6 +62,17 @@ export class NewsService {
      */
     async updateNews(id: string, data: Partial<News>) {
         try {
+            // İçeriğin kelime sayısını kontrol et
+            if (data.content) {
+                const wordCount = data.content.trim().split(/\s+/).length;
+                if (wordCount < 10) {
+                    return { 
+                        error: 'İçerik en az 10 kelime olmalıdır', 
+                        data: null 
+                    };
+                }
+            }
+
             // Update timestamp
             data.updated_at = new Date().toISOString();
 
@@ -136,7 +159,8 @@ export class NewsService {
                 .select(`
                     *,
                     sport:sport_id(id, name, icon)
-                `, { count: 'exact' });
+                `, { count: 'exact' })
+                .eq('status', 1);
 
             // Filter by sport if provided
             if (sport_id) {
@@ -173,7 +197,8 @@ export class NewsService {
                 .select(`
                     *,
                     sport:sport_id(id, name, icon)
-                `);
+                `)
+                .eq('status', 1);
 
             // Filter by sport if provided
             if (sport_id) {
@@ -210,6 +235,7 @@ export class NewsService {
                     *,
                     sport:sport_id(id, name, icon)
                 `)
+                .eq('status', 1)
                 .or(`title.ilike.%${searchTerm}%,content.ilike.%${searchTerm}%`)
                 .order('published_date', { ascending: false })
                 .limit(limit);
@@ -223,6 +249,47 @@ export class NewsService {
         } catch (error: any) {
             console.error('Unexpected error in searchNews service:', error);
             return { error: error.message || 'Failed to search news', data: null };
+        }
+    }
+
+    /**
+     * Get active news with status=1
+     */
+    async getActiveNews(page: number, limit: number, sport_id?: string) {
+        try {
+            // Calculate offset for pagination
+            const offset = (page - 1) * limit;
+
+            // Build query
+            let query = supabaseAdmin
+                .from(this.TABLE_NAME)
+                .select(`
+                    *,
+                    sport:sport_id(id, name, icon)
+                `, { count: 'exact' })
+                .eq('status', 1);
+
+            // Filter by sport if provided
+            if (sport_id) {
+                query = query.eq('sport_id', sport_id);
+            }
+
+            // Add pagination
+            query = query.order('published_date', { ascending: false })
+                .range(offset, offset + limit - 1);
+
+            // Execute query
+            const { data, error, count } = await query;
+
+            if (error) {
+                console.error('Error listing active news:', error);
+                return { error: error.message, data: null, count: 0 };
+            }
+
+            return { data, error: null, count };
+        } catch (error: any) {
+            console.error('Unexpected error in getActiveNews service:', error);
+            return { error: error.message || 'Failed to list active news', data: null, count: 0 };
         }
     }
 } 
