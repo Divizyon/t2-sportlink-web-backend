@@ -766,4 +766,213 @@ export class EventService {
             };
         }
     }
+
+    /**
+     * Katıldığı etkinlikleri kullanıcı ID'sine göre getir
+     */
+    async getUserEvents(userId: string, page: number = 1, limit: number = 10) {
+        try {
+            console.log(`Fetching events for user ${userId}, page: ${page}, limit: ${limit}`);
+            
+            const skip = (page - 1) * limit;
+            
+            // Kullanıcının katıldığı etkinlikleri say
+            const totalCount = await prisma.event_Participants.count({
+                where: {
+                    user_id: BigInt(userId),
+                }
+            });
+            
+            // Kullanıcının katıldığı etkinlikleri getir
+            const userEvents = await prisma.event_Participants.findMany({
+                where: {
+                    user_id: BigInt(userId),
+                },
+                include: {
+                    event: {
+                        include: {
+                            sport: true,
+                            creator: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    first_name: true,
+                                    last_name: true,
+                                    profile_picture: true
+                                }
+                            },
+                            participants: {
+                                include: {
+                                    user: {
+                                        select: {
+                                            id: true,
+                                            username: true,
+                                            first_name: true,
+                                            last_name: true,
+                                            profile_picture: true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                skip,
+                take: limit,
+                orderBy: {
+                    joined_at: 'desc'
+                }
+            });
+            
+            // BigInt'leri stringe çevir
+            const formattedEvents = userEvents.map(eventParticipant => {
+                return {
+                    ...eventParticipant,
+                    event: {
+                        ...eventParticipant.event,
+                        id: eventParticipant.event.id.toString(),
+                        creator_id: eventParticipant.event.creator_id.toString(),
+                        sport_id: eventParticipant.event.sport_id.toString(),
+                        creator: {
+                            ...eventParticipant.event.creator,
+                            id: eventParticipant.event.creator.id.toString()
+                        },
+                        participants: eventParticipant.event.participants.map(participant => {
+                            return {
+                                ...participant,
+                                event_id: participant.event_id.toString(),
+                                user_id: participant.user_id.toString(),
+                                user: {
+                                    ...participant.user,
+                                    id: participant.user.id.toString()
+                                }
+                            };
+                        }),
+                        sport: {
+                            ...eventParticipant.event.sport,
+                            id: eventParticipant.event.sport.id.toString()
+                        }
+                    },
+                    event_id: eventParticipant.event_id.toString(),
+                    user_id: eventParticipant.user_id.toString()
+                };
+            });
+            
+            return {
+                data: {
+                    events: formattedEvents,
+                    pagination: {
+                        total: totalCount,
+                        page,
+                        limit,
+                        totalPages: Math.ceil(totalCount / limit)
+                    }
+                },
+                error: null
+            };
+        } catch (error: any) {
+            console.error(`Error fetching user events: ${error.message}`, error);
+            return { data: null, error: error.message || 'Kullanıcının etkinlikleri getirilirken hata oluştu' };
+        }
+    }
+
+    /**
+     * Kullanıcının oluşturduğu etkinlikleri getir
+     */
+    async getUserCreatedEvents(userId: string, page: number = 1, limit: number = 10) {
+        try {
+            console.log(`Fetching created events for user ${userId}, page: ${page}, limit: ${limit}`);
+            
+            const skip = (page - 1) * limit;
+            
+            // Kullanıcının oluşturduğu etkinlikleri say
+            const totalCount = await prisma.events.count({
+                where: {
+                    creator_id: BigInt(userId),
+                }
+            });
+            
+            // Kullanıcının oluşturduğu etkinlikleri getir
+            const createdEvents = await prisma.events.findMany({
+                where: {
+                    creator_id: BigInt(userId),
+                },
+                include: {
+                    sport: true,
+                    creator: {
+                        select: {
+                            id: true,
+                            username: true,
+                            first_name: true,
+                            last_name: true,
+                            profile_picture: true
+                        }
+                    },
+                    participants: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    first_name: true,
+                                    last_name: true,
+                                    profile_picture: true
+                                }
+                            }
+                        }
+                    }
+                },
+                skip,
+                take: limit,
+                orderBy: {
+                    created_at: 'desc'
+                }
+            });
+            
+            // BigInt'leri stringe çevir
+            const formattedEvents = createdEvents.map(event => {
+                return {
+                    ...event,
+                    id: event.id.toString(),
+                    creator_id: event.creator_id.toString(),
+                    sport_id: event.sport_id.toString(),
+                    creator: {
+                        ...event.creator,
+                        id: event.creator.id.toString()
+                    },
+                    participants: event.participants.map(participant => {
+                        return {
+                            ...participant,
+                            event_id: participant.event_id.toString(),
+                            user_id: participant.user_id.toString(),
+                            user: {
+                                ...participant.user,
+                                id: participant.user.id.toString()
+                            }
+                        };
+                    }),
+                    sport: {
+                        ...event.sport,
+                        id: event.sport.id.toString()
+                    }
+                };
+            });
+            
+            return {
+                data: {
+                    events: formattedEvents,
+                    pagination: {
+                        total: totalCount,
+                        page,
+                        limit,
+                        totalPages: Math.ceil(totalCount / limit)
+                    }
+                },
+                error: null
+            };
+        } catch (error: any) {
+            console.error(`Error fetching user created events: ${error.message}`, error);
+            return { data: null, error: error.message || 'Kullanıcının oluşturduğu etkinlikler getirilirken hata oluştu' };
+        }
+    }
 } 

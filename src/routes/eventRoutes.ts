@@ -17,6 +17,10 @@ router.put('/:id', protect, eventController.updateEvent.bind(eventController));
 router.delete('/:id', protect, eventController.deleteEvent.bind(eventController));
 router.post('/:id/join', protect, eventController.joinEvent.bind(eventController));
 router.delete('/:id/leave', protect, eventController.leaveEvent.bind(eventController));
+router.get('/user/:userId', protect, eventController.getUserEvents.bind(eventController));
+router.get('/my/events', protect, eventController.getUserEvents.bind(eventController));
+router.get('/user/:userId/created', protect, eventController.getUserCreatedEvents.bind(eventController));
+router.get('/my/created', protect, eventController.getUserCreatedEvents.bind(eventController));
 
 // Admin routes - require admin or superadmin role
 router.get('/admin/pending', protect, restrictTo('admin', 'superadmin'), eventController.getPendingEvents.bind(eventController));
