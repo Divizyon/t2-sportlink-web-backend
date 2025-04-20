@@ -12,6 +12,7 @@ import profileRoutes from './routes/profileRoutes';
 import announcementRoutes from './routes/announcementRoutes';
 import newsRoutes from './routes/newsRoutes';
 import sportRoutes from './routes/sportRoutes';
+import adminRoutes from './routes/adminRoutes';
 import { setupEventCronJobs } from './cron/eventStatusUpdater';
 
 // Load environment variables
