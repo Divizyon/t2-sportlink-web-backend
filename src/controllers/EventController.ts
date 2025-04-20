@@ -588,4 +588,94 @@ export class EventController {
             });
         }
     }
+
+    /**
+     * Kullanıcının katıldığı etkinlikleri getir
+     */
+    async getUserEvents(req: Request, res: Response) {
+        try {
+            // URL'den kullanıcı ID'sini al, eğer belirtilmemişse kendi ID'sini kullan
+            const userId = req.params.userId || req.user?.userId;
+            console.log(`Fetching events for user ID: ${userId}`);
+
+            // Kullanıcı kontrolü
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Kimlik doğrulama gerekli',
+                });
+            }
+
+            // Sayfalama parametrelerini al
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 10;
+
+            // Servis metodu ile etkinlikleri getir
+            const { data, error } = await this.eventService.getUserEvents(userId.toString(), page, limit);
+
+            if (error) {
+                return res.status(400).json({
+                    success: false,
+                    message: error,
+                });
+            }
+
+            return res.status(200).json({
+                status: 'success',
+                data,
+            });
+        } catch (error: any) {
+            console.error('Kullanıcı etkinlikleri alınırken hata:', error);
+            return res.status(500).json({
+                status: 'error',
+                message: 'Kullanıcının etkinlikleri getirilirken hata oluştu',
+                error: error.message,
+            });
+        }
+    }
+
+    /**
+     * Kullanıcının oluşturduğu etkinlikleri getir
+     */
+    async getUserCreatedEvents(req: Request, res: Response) {
+        try {
+            // URL'den kullanıcı ID'sini al, eğer belirtilmemişse kendi ID'sini kullan
+            const userId = req.params.userId || req.user?.userId;
+            console.log(`Fetching created events for user ID: ${userId}`);
+
+            // Kullanıcı kontrolü
+            if (!userId) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Kimlik doğrulama gerekli',
+                });
+            }
+
+            // Sayfalama parametrelerini al
+            const page = parseInt(req.query.page as string) || 1;
+            const limit = parseInt(req.query.limit as string) || 10;
+
+            // Servis metodu ile etkinlikleri getir
+            const { data, error } = await this.eventService.getUserCreatedEvents(userId.toString(), page, limit);
+
+            if (error) {
+                return res.status(400).json({
+                    success: false,
+                    message: error,
+                });
+            }
+
+            return res.status(200).json({
+                status: 'success',
+                data,
+            });
+        } catch (error: any) {
+            console.error('Kullanıcının oluşturduğu etkinlikler alınırken hata:', error);
+            return res.status(500).json({
+                status: 'error',
+                message: 'Kullanıcının oluşturduğu etkinlikler getirilirken hata oluştu',
+                error: error.message,
+            });
+        }
+    }
 } 
