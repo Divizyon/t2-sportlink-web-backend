@@ -84,6 +84,7 @@ model Events {
   status             String
   created_at         DateTime             @default(now())
   updated_at         DateTime             @updatedAt
+  approval_status    String               @default("pending")
   participants       Event_Participants[]
   ratings            Event_Ratings[]
   creator            Users                @relation("UserEvents", fields: [creator_id], references: [id])
