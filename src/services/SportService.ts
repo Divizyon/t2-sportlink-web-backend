@@ -57,13 +57,13 @@ export class SportService {
             const { name, sortBy = 'name', order = 'asc' } = filters || {};
             
             // Sorgu koşulları
-            let where: Prisma.SportsWhereInput = {};
+            let where: any = {};
             
             // İsim filtresi varsa ekle
             if (name) {
                 where.name = {
                     contains: name,
-                    mode: Prisma.QueryMode.insensitive // Doğru enum değeri
+                    mode: 'insensitive' // String olarak belirt
                 };
             }
             
