@@ -137,23 +137,35 @@ export class EventService {
                         select: {
                             id: true,
                             username: true,
-                            profile_picture: true
+                            email: true,
+                            first_name: true,
+                            last_name: true,
+                            phone: true,
+                            profile_picture: true,
+                            default_location_latitude: true,
+                            default_location_longitude: true,
+                            role: true,
+                            created_at: true,
+                            updated_at: true
                         }
                     },
-                    sport: {
-                        select: {
-                            id: true,
-                            name: true,
-                            icon: true
-                        }
-                    },
+                    sport: true,
                     participants: {
                         include: {
                             user: {
                                 select: {
                                     id: true,
                                     username: true,
-                                    profile_picture: true
+                                    email: true,
+                                    first_name: true,
+                                    last_name: true,
+                                    phone: true,
+                                    profile_picture: true,
+                                    default_location_latitude: true,
+                                    default_location_longitude: true,
+                                    role: true,
+                                    created_at: true,
+                                    updated_at: true
                                 }
                             }
                         }
@@ -173,23 +185,21 @@ export class EventService {
                     creator_id: event.creator_id.toString(),
                     sport_id: event.sport_id.toString(),
                     creator: {
-                        id: event.creator.id.toString(),
-                        username: event.creator.username,
-                        profile_image: event.creator.profile_picture
+                        ...event.creator,
+                        id: event.creator.id.toString()
                     },
                     sport: {
-                        id: event.sport.id.toString(),
-                        name: event.sport.name,
-                        icon: event.sport.icon
+                        ...event.sport,
+                        id: event.sport.id.toString()
                     },
                     participants: event.participants.map((p: any) => ({
                         event_id: p.event_id.toString(),
                         user_id: p.user_id.toString(),
+                        joined_at: p.joined_at,
                         role: p.role,
                         user: p.user ? {
-                            id: p.user.id.toString(),
-                            username: p.user.username,
-                            profile_image: p.user.profile_picture
+                            ...p.user,
+                            id: p.user.id.toString()
                         } : null
                     }))
                 },
@@ -221,23 +231,35 @@ export class EventService {
                         select: {
                             id: true,
                             username: true,
-                            profile_picture: true
+                            email: true,
+                            first_name: true,
+                            last_name: true,
+                            phone: true,
+                            profile_picture: true,
+                            default_location_latitude: true,
+                            default_location_longitude: true,
+                            role: true,
+                            created_at: true,
+                            updated_at: true
                         }
                     },
-                    sport: {
-                        select: {
-                            id: true,
-                            name: true,
-                            icon: true
-                        }
-                    },
+                    sport: true,
                     participants: {
                         include: {
                             user: {
                                 select: {
                                     id: true,
                                     username: true,
-                                    profile_picture: true
+                                    email: true,
+                                    first_name: true,
+                                    last_name: true,
+                                    phone: true,
+                                    profile_picture: true,
+                                    default_location_latitude: true,
+                                    default_location_longitude: true,
+                                    role: true,
+                                    created_at: true,
+                                    updated_at: true
                                 }
                             }
                         }
@@ -257,23 +279,21 @@ export class EventService {
                     creator_id: event.creator_id.toString(),
                     sport_id: event.sport_id.toString(),
                     creator: {
-                        id: event.creator.id.toString(),
-                        username: event.creator.username,
-                        profile_image: event.creator.profile_picture
+                        ...event.creator,
+                        id: event.creator.id.toString()
                     },
                     sport: {
-                        id: event.sport.id.toString(),
-                        name: event.sport.name,
-                        icon: event.sport.icon
+                        ...event.sport,
+                        id: event.sport.id.toString()
                     },
                     participants: event.participants.map((p: any) => ({
                         event_id: p.event_id.toString(),
                         user_id: p.user_id.toString(),
+                        joined_at: p.joined_at,
                         role: p.role,
                         user: p.user ? {
-                            id: p.user.id.toString(),
-                            username: p.user.username,
-                            profile_image: p.user.profile_picture
+                            ...p.user,
+                            id: p.user.id.toString()
                         } : null
                     }))
                 },
@@ -308,17 +328,39 @@ export class EventService {
                         select: {
                             id: true,
                             username: true,
-                            profile_picture: true
+                            email: true,
+                            first_name: true,
+                            last_name: true,
+                            phone: true,
+                            profile_picture: true,
+                            default_location_latitude: true,
+                            default_location_longitude: true,
+                            role: true,
+                            created_at: true,
+                            updated_at: true
                         }
                     },
-                    sport: {
-                        select: {
-                            id: true,
-                            name: true,
-                            icon: true
+                    sport: true,
+                    participants: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                    first_name: true,
+                                    last_name: true,
+                                    phone: true,
+                                    profile_picture: true,
+                                    default_location_latitude: true,
+                                    default_location_longitude: true,
+                                    role: true,
+                                    created_at: true,
+                                    updated_at: true
+                                }
+                            }
                         }
-                    },
-                    participants: true
+                    }
                 },
                 orderBy: {
                     event_date: 'asc'
@@ -337,19 +379,22 @@ export class EventService {
                 creator_id: event.creator_id.toString(),
                 sport_id: event.sport_id.toString(),
                 creator: {
-                    id: event.creator.id.toString(),
-                    username: event.creator.username,
-                    profile_image: event.creator.profile_picture
+                    ...event.creator,
+                    id: event.creator.id.toString()
                 },
                 sport: {
-                    id: event.sport.id.toString(),
-                    name: event.sport.name,
-                    icon: event.sport.icon
+                    ...event.sport,
+                    id: event.sport.id.toString()
                 },
                 participants: event.participants.map((p: any) => ({
                     event_id: p.event_id.toString(),
                     user_id: p.user_id.toString(),
-                    role: p.role
+                    joined_at: p.joined_at,
+                    role: p.role,
+                    user: p.user ? {
+                        ...p.user,
+                        id: p.user.id.toString()
+                    } : null
                 }))
             }));
 
@@ -381,17 +426,39 @@ export class EventService {
                         select: {
                             id: true,
                             username: true,
-                            profile_picture: true
+                            email: true,
+                            first_name: true,
+                            last_name: true,
+                            phone: true,
+                            profile_picture: true,
+                            default_location_latitude: true,
+                            default_location_longitude: true,
+                            role: true,
+                            created_at: true,
+                            updated_at: true
                         }
                     },
-                    sport: {
-                        select: {
-                            id: true,
-                            name: true,
-                            icon: true
+                    sport: true,
+                    participants: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                    first_name: true,
+                                    last_name: true,
+                                    phone: true,
+                                    profile_picture: true,
+                                    default_location_latitude: true,
+                                    default_location_longitude: true,
+                                    role: true,
+                                    created_at: true,
+                                    updated_at: true
+                                }
+                            }
                         }
-                    },
-                    participants: true
+                    }
                 },
                 orderBy: {
                     event_date: 'asc'
@@ -406,19 +473,22 @@ export class EventService {
                 creator_id: event.creator_id.toString(),
                 sport_id: event.sport_id.toString(),
                 creator: {
-                    id: event.creator.id.toString(),
-                    username: event.creator.username,
-                    profile_image: event.creator.profile_picture
+                    ...event.creator,
+                    id: event.creator.id.toString()
                 },
                 sport: {
-                    id: event.sport.id.toString(),
-                    name: event.sport.name,
-                    icon: event.sport.icon
+                    ...event.sport,
+                    id: event.sport.id.toString()
                 },
                 participants: event.participants.map((p: any) => ({
                     event_id: p.event_id.toString(),
                     user_id: p.user_id.toString(),
-                    role: p.role
+                    joined_at: p.joined_at,
+                    role: p.role,
+                    user: p.user ? {
+                        ...p.user,
+                        id: p.user.id.toString()
+                    } : null
                 }))
             }));
 
@@ -558,14 +628,37 @@ export class EventService {
                         select: {
                             id: true,
                             username: true,
-                            profile_picture: true
+                            email: true,
+                            first_name: true,
+                            last_name: true,
+                            phone: true,
+                            profile_picture: true,
+                            default_location_latitude: true,
+                            default_location_longitude: true,
+                            role: true,
+                            created_at: true,
+                            updated_at: true
                         }
                     },
-                    sport: {
-                        select: {
-                            id: true,
-                            name: true,
-                            icon: true
+                    sport: true,
+                    participants: {
+                        include: {
+                            user: {
+                                select: {
+                                    id: true,
+                                    username: true,
+                                    email: true,
+                                    first_name: true,
+                                    last_name: true,
+                                    phone: true,
+                                    profile_picture: true,
+                                    default_location_latitude: true,
+                                    default_location_longitude: true,
+                                    role: true,
+                                    created_at: true,
+                                    updated_at: true
+                                }
+                            }
                         }
                     }
                 },
@@ -590,15 +683,23 @@ export class EventService {
                 creator_id: event.creator_id.toString(),
                 sport_id: event.sport_id.toString(),
                 creator: {
-                    id: event.creator.id.toString(),
-                    username: event.creator.username,
-                    profile_image: event.creator.profile_picture
+                    ...event.creator,
+                    id: event.creator.id.toString()
                 },
                 sport: {
-                    id: event.sport.id.toString(),
-                    name: event.sport.name,
-                    icon: event.sport.icon
-                }
+                    ...event.sport,
+                    id: event.sport.id.toString()
+                },
+                participants: event.participants.map((p: any) => ({
+                    event_id: p.event_id.toString(),
+                    user_id: p.user_id.toString(),
+                    joined_at: p.joined_at,
+                    role: p.role,
+                    user: p.user ? {
+                        ...p.user,
+                        id: p.user.id.toString()
+                    } : null
+                }))
             }));
 
             return {
@@ -773,16 +874,16 @@ export class EventService {
     async getUserEvents(userId: string, page: number = 1, limit: number = 10) {
         try {
             console.log(`Fetching events for user ${userId}, page: ${page}, limit: ${limit}`);
-            
+
             const skip = (page - 1) * limit;
-            
+
             // Kullanıcının katıldığı etkinlikleri say
             const totalCount = await prisma.event_Participants.count({
                 where: {
                     user_id: BigInt(userId),
                 }
             });
-            
+
             // Kullanıcının katıldığı etkinlikleri getir
             const userEvents = await prisma.event_Participants.findMany({
                 where: {
@@ -796,9 +897,16 @@ export class EventService {
                                 select: {
                                     id: true,
                                     username: true,
+                                    email: true,
                                     first_name: true,
                                     last_name: true,
-                                    profile_picture: true
+                                    phone: true,
+                                    profile_picture: true,
+                                    default_location_latitude: true,
+                                    default_location_longitude: true,
+                                    role: true,
+                                    created_at: true,
+                                    updated_at: true
                                 }
                             },
                             participants: {
@@ -807,9 +915,16 @@ export class EventService {
                                         select: {
                                             id: true,
                                             username: true,
+                                            email: true,
                                             first_name: true,
                                             last_name: true,
-                                            profile_picture: true
+                                            phone: true,
+                                            profile_picture: true,
+                                            default_location_latitude: true,
+                                            default_location_longitude: true,
+                                            role: true,
+                                            created_at: true,
+                                            updated_at: true
                                         }
                                     }
                                 }
@@ -823,7 +938,7 @@ export class EventService {
                     joined_at: 'desc'
                 }
             });
-            
+
             // BigInt'leri stringe çevir
             const formattedEvents = userEvents.map(eventParticipant => {
                 return {
@@ -857,7 +972,7 @@ export class EventService {
                     user_id: eventParticipant.user_id.toString()
                 };
             });
-            
+
             return {
                 data: {
                     events: formattedEvents,
@@ -882,16 +997,16 @@ export class EventService {
     async getUserCreatedEvents(userId: string, page: number = 1, limit: number = 10) {
         try {
             console.log(`Fetching created events for user ${userId}, page: ${page}, limit: ${limit}`);
-            
+
             const skip = (page - 1) * limit;
-            
+
             // Kullanıcının oluşturduğu etkinlikleri say
             const totalCount = await prisma.events.count({
                 where: {
                     creator_id: BigInt(userId),
                 }
             });
-            
+
             // Kullanıcının oluşturduğu etkinlikleri getir
             const createdEvents = await prisma.events.findMany({
                 where: {
@@ -903,9 +1018,16 @@ export class EventService {
                         select: {
                             id: true,
                             username: true,
+                            email: true,
                             first_name: true,
                             last_name: true,
-                            profile_picture: true
+                            phone: true,
+                            profile_picture: true,
+                            default_location_latitude: true,
+                            default_location_longitude: true,
+                            role: true,
+                            created_at: true,
+                            updated_at: true
                         }
                     },
                     participants: {
@@ -914,9 +1036,16 @@ export class EventService {
                                 select: {
                                     id: true,
                                     username: true,
+                                    email: true,
                                     first_name: true,
                                     last_name: true,
-                                    profile_picture: true
+                                    phone: true,
+                                    profile_picture: true,
+                                    default_location_latitude: true,
+                                    default_location_longitude: true,
+                                    role: true,
+                                    created_at: true,
+                                    updated_at: true
                                 }
                             }
                         }
@@ -928,7 +1057,7 @@ export class EventService {
                     created_at: 'desc'
                 }
             });
-            
+
             // BigInt'leri stringe çevir
             const formattedEvents = createdEvents.map(event => {
                 return {
@@ -957,7 +1086,7 @@ export class EventService {
                     }
                 };
             });
-            
+
             return {
                 data: {
                     events: formattedEvents,
