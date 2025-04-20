@@ -12,7 +12,12 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "ts-node prisma/seed.ts"
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "scrape:konyaspor": "ts-node src/scripts/konyasporScraper.ts",
+    "update:news": "ts-node src/scripts/updateNewsContent.ts",
+    "scrape:sporx": "ts-node src/scripts/sporxScraper.ts",
+    "scrape:news": "ts-node src/scripts/newsScraper.ts",
+    "scrape:all": "npm run scrape:konyaspor && npm run scrape:sporx && npm run scrape:news && npm run update:news"
   },
   "keywords": [
     "sportlink",
