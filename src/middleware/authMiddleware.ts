@@ -20,39 +20,86 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
   try {
     // Token'ı header'dan al
     const authHeader = req.headers.authorization;
+    console.log('Auth Headers:', {
+      path: req.path,
+      method: req.method,
+      hasAuthHeader: !!authHeader
+    });
+    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Yetkilendirme başarısız' });
+      console.log('No valid auth header');
+      return res.status(401).json({ 
+        status: 'error',
+        message: 'Kullanıcı bulunamadı.'
+      });
     }
 
     const token = authHeader.split(' ')[1];
     if (!token) {
-      return res.status(401).json({ error: 'Geçersiz token formatı' });
+      console.log('Token not provided after Bearer');
+      return res.status(401).json({ 
+        status: 'error',
+        message: 'Kullanıcı bulunamadı.'
+      });
     }
 
-    // Token'ı doğrula
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret') as {
-      userId: bigint;
-      email: string;
-      role: string;
-    };
+    console.log('Token received:', token.substring(0, 15) + '...');
+    
+    try {
+      // Token'ı doğrula
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'default_secret') as {
+        userId: string;
+        email: string;
+        role: string;
+      };
+      
+      console.log('Token decoded successfully:', {
+        userId: decoded.userId,
+        email: decoded.email,
+        role: decoded.role
+      });
 
-    // Kullanıcıyı kontrol et
-    const user = await findUserById(decoded.userId);
-    if (!user) {
-      return res.status(401).json({ error: 'Kullanıcı bulunamadı' });
+      // Kullanıcıyı kontrol et
+      const user = await findUserById(BigInt(decoded.userId));
+      console.log('User lookup result:', { userFound: !!user });
+      
+      if (!user) {
+        return res.status(401).json({ 
+          status: 'error',
+          message: 'Kullanıcı bulunamadı.'
+        });
+      }
+
+      // Request nesnesine kullanıcı bilgilerini ekle
+      req.user = {
+        userId: BigInt(decoded.userId),
+        email: decoded.email,
+        role: decoded.role
+      };
+
+      next();
+    } catch (error) {
+      console.error('Token verification error:', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown error type',
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      });
+      
+      return res.status(401).json({ 
+        status: 'error',
+        message: 'Kullanıcı bulunamadı.'
+      });
     }
-
-    // Request nesnesine kullanıcı bilgilerini ekle
-    req.user = {
-      userId: decoded.userId,
-      email: decoded.email,
-      role: decoded.role
-    };
-
-    next();
   } catch (error) {
-    console.error('Authentication error:', error);
-    return res.status(401).json({ error: 'Yetkilendirme başarısız' });
+    console.error('Authentication general error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : 'No stack trace'
+    });
+    
+    return res.status(401).json({ 
+      status: 'error',
+      message: 'Kullanıcı bulunamadı.'
+    });
   }
 };
 
@@ -75,39 +122,38 @@ export const adminOnly = isAdmin;
 export const restrictTo = (...roles: string[]) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
+      console.log('restrictTo middleware called with roles:', roles);
+      
       if (!req.user) {
+        console.log('No user in request');
         return res.status(401).json({
           status: 'error',
           message: 'Bu işlemi gerçekleştirmek için giriş yapmalısınız.'
         });
       }
       
+      console.log('User from request:', {
+        userId: req.user.userId.toString(),
+        role: req.user.role
+      });
 
-      // Get user role from the database
-      const { data, error } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', req.user.userId)
-        .single();
-
-      if (error || !data) {
-        return res.status(401).json({
-          status: 'error',
-          message: 'Kullanıcı bulunamadı.'
+      // Kullanıcı rolünü doğrudan request'ten al
+      if (!roles.includes(req.user.role)) {
+        console.log('User role not authorized:', {
+          userRole: req.user.role,
+          allowedRoles: roles
         });
-      }
-
-      // Check if user role is allowed
-      if (!roles.includes(data.role)) {
+        
         return res.status(403).json({
           status: 'error',
           message: 'Bu işlemi gerçekleştirmek için yetkiniz yok.'
         });
       }
 
+      console.log('User authorized for action');
       next();
     } catch (error) {
-      console.error('Role restriction error:', error);
+      console.error('Role restriction error:', error instanceof Error ? error.message : 'Unknown error');
       return res.status(500).json({
         status: 'error',
         message: 'Yetkilendirme sırasında bir hata oluştu.'
