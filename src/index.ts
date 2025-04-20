@@ -12,7 +12,7 @@ import profileRoutes from './routes/profileRoutes';
 import announcementRoutes from './routes/announcementRoutes';
 import newsRoutes from './routes/newsRoutes';
 import sportRoutes from './routes/sportRoutes';
-import adminRoutes from './routes/adminRoutes';
+import { setupEventCronJobs } from './cron/eventStatusUpdater';
 
 // Load environment variables
 dotenv.config();
@@ -21,7 +21,7 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 
-(BigInt.prototype as any).toJSON = function() {
+(BigInt.prototype as any).toJSON = function () {
     return this.toString();
 };
 
@@ -67,6 +67,9 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
         error: process.env.NODE_ENV === 'development' ? err.message : 'Bilinmeyen hata'
     });
 });
+
+// Setup cron jobs
+setupEventCronJobs();
 
 // Start server
 app.listen(PORT, () => {

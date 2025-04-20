@@ -82,6 +82,7 @@ model Events {
   location_longitude Float
   max_participants   Int
   status             String
+  approval_status    String               @default("pending")
   created_at         DateTime             @default(now())
   updated_at         DateTime             @updatedAt
   approval_status    String               @default("pending")
