@@ -1,23 +1,23 @@
-import express from 'express';
+import { Router } from 'express';
+import { protect, adminOnly } from '../middleware/authMiddleware';
 import { SportController } from '../controllers/SportController';
-import { authenticate, adminOnly } from '../middleware/authMiddleware';
 
-const router = express.Router();
+const router = Router();
 const sportController = new SportController();
 
-// GET - Tüm sporları getir (herkes erişebilir)
+// Tüm sporları getirme - herkes erişebilir
 router.get('/', sportController.getAllSports.bind(sportController));
 
-// GET - ID'ye göre spor getir (herkes erişebilir)
+// Spor detayını ID ile getirme - herkes erişebilir
 router.get('/:id', sportController.getSportById.bind(sportController));
 
-// POST - Yeni spor oluştur (sadece admin yetkisi gerekli)
-router.post('/', authenticate, adminOnly, sportController.createSport.bind(sportController));
+// Yeni spor ekleme - sadece admin erişebilir
+router.post('/', protect, adminOnly, sportController.createSport.bind(sportController));
 
-// PUT - Spor güncelle (sadece admin yetkisi gerekli)
-router.put('/:id', authenticate, adminOnly, sportController.updateSport.bind(sportController));
+// Spor güncelleme - sadece admin erişebilir
+router.put('/:id', protect, adminOnly, sportController.updateSport.bind(sportController));
 
-// DELETE - Spor sil (sadece admin yetkisi gerekli)
-router.delete('/:id', authenticate, adminOnly, sportController.deleteSport.bind(sportController));
+// Spor silme - sadece admin erişebilir
+router.delete('/:id', protect, adminOnly, sportController.deleteSport.bind(sportController));
 
 export default router; 

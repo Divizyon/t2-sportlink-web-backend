@@ -1,5 +1,5 @@
 import express from 'express';
-import { authenticate } from '../middleware/authMiddleware';
+import { protect } from '../middleware/authMiddleware';
 import { restrictTo } from '../middleware/authMiddleware';
 import AdminController from '../controllers/AdminController';
 
@@ -91,7 +91,7 @@ const adminController = new AdminController();
  *       500:
  *         description: Sunucu hatası
  */
-router.get('/users', authenticate, restrictTo('admin', 'superadmin'), adminController.listAllUsers);
+router.get('/users', protect, restrictTo('admin', 'superadmin'), adminController.listAllUsers);
 
 /**
  * @swagger
@@ -151,7 +151,7 @@ router.get('/users', authenticate, restrictTo('admin', 'superadmin'), adminContr
  *       500:
  *         description: Sunucu hatası
  */
-router.get('/users/:id', authenticate, restrictTo('admin', 'superadmin'), adminController.getUserDetails);
+router.get('/users/:id', protect, restrictTo('admin', 'superadmin'), adminController.getUserDetails);
 
 /**
  * @swagger
@@ -217,7 +217,7 @@ router.get('/users/:id', authenticate, restrictTo('admin', 'superadmin'), adminC
  *       500:
  *         description: Sunucu hatası
  */
-router.patch('/users/:id/role', authenticate, restrictTo('admin', 'superadmin'), adminController.updateUserRole);
+router.patch('/users/:id/role', protect, restrictTo('admin', 'superadmin'), adminController.updateUserRole);
 
 /**
  * @swagger
@@ -283,7 +283,7 @@ router.patch('/users/:id/role', authenticate, restrictTo('admin', 'superadmin'),
  *       500:
  *         description: Sunucu hatası
  */
-router.put('/users/:id/role', authenticate, restrictTo('admin', 'superadmin'), adminController.updateUserRole);
+router.put('/users/:id/role', protect, restrictTo('admin', 'superadmin'), adminController.updateUserRole);
 
 /**
  * @swagger
@@ -368,7 +368,7 @@ router.put('/users/:id/role', authenticate, restrictTo('admin', 'superadmin'), a
  *       500:
  *         description: Sunucu hatası
  */
-router.post('/users', authenticate, restrictTo('admin', 'superadmin'), adminController.createUser);
+router.post('/users', protect, restrictTo('admin', 'superadmin'), adminController.createUser);
 
 /**
  * @swagger
@@ -410,7 +410,7 @@ router.post('/users', authenticate, restrictTo('admin', 'superadmin'), adminCont
  *       500:
  *         description: Sunucu hatası
  */
-router.delete('/users/:id', authenticate, restrictTo('admin', 'superadmin'), adminController.deleteUser);
+router.delete('/users/:id', protect, restrictTo('admin', 'superadmin'), adminController.deleteUser);
 
 /**
  * @swagger
@@ -483,6 +483,6 @@ router.delete('/users/:id', authenticate, restrictTo('admin', 'superadmin'), adm
  *       500:
  *         description: Sunucu hatası
  */
-router.put('/profile', authenticate, restrictTo('admin', 'superadmin'), adminController.updateProfile);
+router.put('/profile', protect, restrictTo('admin', 'superadmin'), adminController.updateProfile);
 
 export default router; 
