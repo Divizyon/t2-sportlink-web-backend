@@ -47,7 +47,7 @@ const createEventSchema = z.object({
   location_latitude: z.number().min(-90).max(90),
   location_longitude: z.number().min(-180).max(180),
   max_participants: z.number().int().positive(),
-  status: z.enum(['active', 'canceled', 'completed', 'draft']),
+  status: z.enum(['active', 'canceled', 'completed', 'draft', 'pending']),
 });
 
 // Etkinlik güncelleme için schema
@@ -67,7 +67,7 @@ const updateEventSchema = z.object({
   location_latitude: z.number().min(-90).max(90).optional(),
   location_longitude: z.number().min(-180).max(180).optional(),
   max_participants: z.number().int().positive().optional(),
-  status: z.enum(['active', 'canceled', 'completed', 'draft']).optional(),
+  status: z.enum(['active', 'canceled', 'completed', 'draft', 'pending']).optional(),
 });
 
 // Etkinlik değerlendirme için schema
@@ -174,9 +174,16 @@ export const createEvent = async (req: Request, res: Response) => {
     }
 
     const data = validationResult.data;
-    
+
     // Kullanıcı ID'sini ekle
     const userId = req.user.id;
+    const userRole = req.user.role;
+
+    // Admin veya superadmin ise etkinlik direkt aktif olur, diğer durumlarda onay bekler
+    let status = data.status;
+    if (status === 'active' && userRole !== 'admin' && userRole !== 'superadmin') {
+      status = 'pending';
+    }
 
     const event = await EventWithExtensions.create({
       title: data.title,
@@ -188,7 +195,7 @@ export const createEvent = async (req: Request, res: Response) => {
       location_latitude: data.location_latitude,
       location_longitude: data.location_longitude,
       max_participants: data.max_participants,
-      status: data.status,
+      status: status,
       creator: { connect: { id: userId } },
       sport: { connect: { id: data.sport_id } }
     });
@@ -559,11 +566,11 @@ export const searchEvents = async (req: Request, res: Response) => {
     // Tarih filtresi
     if (startDate || endDate) {
       where.event_date = {};
-      
+
       if (startDate) {
         where.event_date.gte = new Date(startDate);
       }
-      
+
       if (endDate) {
         where.event_date.lte = new Date(endDate);
       }
@@ -649,12 +656,12 @@ export const getRecommendedEvents = async (req: Request, res: Response) => {
 
     // Kullanıcının spor tercihleri
     const userSports = await EventWithExtensions.getUserSportPreferences(userId);
-    
+
     if (!userSports.length) {
       return res.status(200).json({
         success: true,
         message: 'Öneri almak için spor tercihlerinizi ekleyin',
-        data: { 
+        data: {
           events: [],
           pagination: {
             page,
@@ -668,10 +675,10 @@ export const getRecommendedEvents = async (req: Request, res: Response) => {
 
     // Kullanıcının tercih ettiği sporlar için etkinlikleri getir
     const sportIds = userSports.map(sport => sport.sport_id);
-    
+
     // Kullanıcının katıldığı etkinlikleri bulalım
     const userParticipations = await EventWithExtensions.countUserEvents(userId);
-    
+
     // Konum tercihi kontrolü
     const userProfile = await prisma.user.findUnique({
       where: { id: userId },
@@ -866,18 +873,18 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   const R = 6371; // Dünya yarıçapı (km)
   const dLat = toRad(lat2 - lat1);
   const dLon = toRad(lon2 - lon1);
-  const a = 
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * 
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const distance = R * c; // Kilometre cinsinden mesafe
   return parseFloat(distance.toFixed(2));
 }
 
 // Derece cinsinden açıyı radyana çevir
 function toRad(deg: number): number {
-  return deg * (Math.PI/180);
+  return deg * (Math.PI / 180);
 }
 
 // Event sınıfına eklenmesi gereken yardımcı metotlar

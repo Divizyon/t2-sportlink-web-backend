@@ -11,6 +11,7 @@ import eventRoutes from './routes/eventRoutes';
 import friendRoutes from './routes/friendRoutes';
 import reportRoutes from './routes/reportRoutes';
 import newsRoutes from './routes/newsRoutes';
+import adminRoutes from './routes/adminRoutes';
 
 // Çevre değişkenlerini yükle
 dotenv.config();
@@ -51,6 +52,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/friends', friendRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/news', newsRoutes);
+app.use('/api/admin', adminRoutes);
 
 // 404 handler
 app.use((_: Request, res: Response) => {
