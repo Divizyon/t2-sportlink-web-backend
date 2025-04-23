@@ -9,6 +9,8 @@ import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
 import eventRoutes from './routes/eventRoutes';
 import friendRoutes from './routes/friendRoutes';
+import reportRoutes from './routes/reportRoutes';
+import newsRoutes from './routes/newsRoutes';
 
 // Çevre değişkenlerini yükle
 dotenv.config();
@@ -47,6 +49,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/friends', friendRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/news', newsRoutes);
 
 // 404 handler
 app.use((_: Request, res: Response) => {
@@ -60,7 +64,7 @@ app.use((_: Request, res: Response) => {
 // Hata işleyici
 app.use((err: any, _: Request, res: Response, __: NextFunction) => {
   console.error('Sunucu hatası:', err);
-  
+
   res.status(err.status || 500).json({
     success: false,
     message: err.message || 'Sunucu hatası oluştu',
