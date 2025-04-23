@@ -220,6 +220,7 @@ export const updateEvent = async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     const userId = req.user.id;
+    const userRole = req.user.role;
 
     // Etkinliğin var olup olmadığını kontrol et
     const existingEvent = await EventWithExtensions.findUnique({
@@ -233,8 +234,8 @@ export const updateEvent = async (req: Request, res: Response) => {
       });
     }
 
-    // Etkinliğin sahibi olup olmadığını kontrol et
-    if (existingEvent.creator_id !== userId) {
+    // Etkinliğin sahibi veya admin/superadmin olup olmadığını kontrol et
+    if (existingEvent.creator_id !== userId && userRole !== 'admin' && userRole !== 'superadmin') {
       return res.status(403).json({
         success: false,
         message: 'Bu etkinliği değiştirme yetkiniz yok'
@@ -259,6 +260,17 @@ export const updateEvent = async (req: Request, res: Response) => {
       data
     );
 
+    // Admin veya superadmin ise log kaydı oluştur
+    if (userRole === 'admin' || userRole === 'superadmin') {
+      await prisma.admin_log.create({
+        data: {
+          admin_id: userId,
+          action_type: 'update_event',
+          description: `"${existingEvent.title}" başlıklı etkinlik güncellendi${existingEvent.creator_id !== userId ? ' (etkinlik sahibi değil)' : ''}`
+        }
+      });
+    }
+
     return res.status(200).json({
       success: true,
       message: 'Etkinlik başarıyla güncellendi',
@@ -279,6 +291,7 @@ export const deleteEvent = async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
     const userId = req.user.id;
+    const userRole = req.user.role;
 
     // Etkinliğin var olup olmadığını kontrol et
     const existingEvent = await EventWithExtensions.findUnique({
@@ -292,8 +305,8 @@ export const deleteEvent = async (req: Request, res: Response) => {
       });
     }
 
-    // Etkinliğin sahibi olup olmadığını kontrol et
-    if (existingEvent.creator_id !== userId) {
+    // Etkinliğin sahibi veya admin/superadmin olup olmadığını kontrol et
+    if (existingEvent.creator_id !== userId && userRole !== 'admin' && userRole !== 'superadmin') {
       return res.status(403).json({
         success: false,
         message: 'Bu etkinliği silme yetkiniz yok'
@@ -302,6 +315,17 @@ export const deleteEvent = async (req: Request, res: Response) => {
 
     // Etkinliği sil
     await EventWithExtensions.delete({ id: eventId });
+
+    // Admin veya superadmin ise log kaydı oluştur
+    if (userRole === 'admin' || userRole === 'superadmin') {
+      await prisma.admin_log.create({
+        data: {
+          admin_id: userId,
+          action_type: 'delete_event',
+          description: `"${existingEvent.title}" başlıklı etkinlik silindi${existingEvent.creator_id !== userId ? ' (etkinlik sahibi değil)' : ''}`
+        }
+      });
+    }
 
     return res.status(200).json({
       success: true,
