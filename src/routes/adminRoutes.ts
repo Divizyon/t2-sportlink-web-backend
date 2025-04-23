@@ -1,6 +1,15 @@
 import { Router } from 'express';
 import { AdminController } from '../controllers/adminController';
 import { AdminNewsController } from '../controllers/adminNewsController';
+import {
+    getAdminAnnouncements,
+    createAnnouncement,
+    getAnnouncementById,
+    updateAnnouncement,
+    deleteAnnouncement,
+    publishAnnouncement,
+    unpublishAnnouncement
+} from '../controllers/announcementController';
 import { authenticate } from '../middlewares/authMiddleware';
 import { adminOnly } from '../middlewares/adminMiddleware';
 
@@ -36,5 +45,28 @@ router.delete('/news/:newsId', AdminNewsController.deleteNews);
 
 // Spor dallarını listele (haber oluşturma/düzenleme için)
 router.get('/sports', AdminNewsController.getSports);
+
+// DUYURU YÖNETİMİ
+
+// Tüm duyuruları listele (yönetim paneli için)
+router.get('/announcements', getAdminAnnouncements);
+
+// Yeni duyuru oluştur
+router.post('/announcements', createAnnouncement);
+
+// Duyuru detayını görüntüle
+router.get('/announcements/:announcementId', getAnnouncementById);
+
+// Duyuru güncelle
+router.put('/announcements/:announcementId', updateAnnouncement);
+
+// Duyuru sil
+router.delete('/announcements/:announcementId', deleteAnnouncement);
+
+// Duyuruyu yayınla
+router.put('/announcements/:announcementId/publish', publishAnnouncement);
+
+// Duyuruyu yayından kaldır
+router.put('/announcements/:announcementId/unpublish', unpublishAnnouncement);
 
 export default router; 
