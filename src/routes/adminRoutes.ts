@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { AdminController } from '../controllers/adminController';
+import { AdminNewsController } from '../controllers/adminNewsController';
 import { authenticate } from '../middlewares/authMiddleware';
 import { adminOnly } from '../middlewares/adminMiddleware';
 
@@ -7,6 +8,8 @@ const router = Router();
 
 // Bütün admin rotaları için authentication ve admin kontrolü
 router.use(authenticate, adminOnly);
+
+// ETKİNLİK YÖNETİMİ
 
 // Onay bekleyen etkinlikleri listele
 router.get('/events/pending', AdminController.getPendingEvents);
@@ -16,5 +19,22 @@ router.put('/events/:eventId/approve-reject', AdminController.approveOrRejectEve
 
 // Filtreli etkinlik listesi (admin paneli için)
 router.get('/events/filter', AdminController.getFilteredEvents);
+
+// HABER YÖNETİMİ
+
+// Tüm haberleri listele (yönetim paneli için)
+router.get('/news', AdminNewsController.getAllNews);
+
+// Yeni haber oluştur
+router.post('/news', AdminNewsController.createNews);
+
+// Haber düzenle
+router.put('/news/:newsId', AdminNewsController.updateNews);
+
+// Haber sil
+router.delete('/news/:newsId', AdminNewsController.deleteNews);
+
+// Spor dallarını listele (haber oluşturma/düzenleme için)
+router.get('/sports', AdminNewsController.getSports);
 
 export default router; 

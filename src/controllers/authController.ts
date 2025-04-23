@@ -24,9 +24,10 @@ export const authController = {
    */
   async register(req: Request, res: Response, next: NextFunction): Promise<Response | void> {
     try {
+
       // Gelen verileri doğrula
       const validationResult = registerSchema.safeParse(req.body);
-      
+
       if (!validationResult.success) {
         return res.status(400).json({
           success: false,
@@ -37,14 +38,14 @@ export const authController = {
 
       // Doğrulanmış verileri al
       const userData = validationResult.data;
-      
+
       // Kayıt servisini çağır
       const result = await authService.register(userData);
-      
+
       if (!result.success) {
         return res.status(400).json(result);
       }
-      
+
       return res.status(201).json(result);
     } catch (error: any) {
       next(error);
@@ -58,7 +59,7 @@ export const authController = {
     try {
       // Gelen verileri doğrula
       const validationResult = loginSchema.safeParse(req.body);
-      
+
       if (!validationResult.success) {
         return res.status(400).json({
           success: false,
@@ -69,17 +70,17 @@ export const authController = {
 
       // Doğrulanmış verileri al
       const loginData = validationResult.data;
-      
+
       // Giriş servisini çağır
       const result = await authService.login(loginData);
-      
+
       if (!result.success) {
         return res.status(401).json(result);
       }
-      
+
       // Oturum bilgilerini kaydet (refresh token, access token)
       // Gerçek projede bu kısım genellikle cookie ile yapılır
-      
+
       return res.json(result);
     } catch (error: any) {
       next(error);
@@ -92,20 +93,20 @@ export const authController = {
   async verifyEmail(req: Request, res: Response, next: NextFunction): Promise<Response | void> {
     try {
       const { token } = req.query;
-      
+
       if (!token || typeof token !== 'string') {
         return res.status(400).json({
           success: false,
           message: 'Geçersiz veya eksik token',
         });
       }
-      
+
       const result = await authService.handleEmailVerification(token);
-      
+
       if (!result.success) {
         return res.status(400).json(result);
       }
-      
+
       return res.json(result);
     } catch (error: any) {
       next(error);
@@ -118,11 +119,11 @@ export const authController = {
   async logout(_req: Request, res: Response, next: NextFunction): Promise<Response | void> {
     try {
       const result = await authService.logout();
-      
+
       if (!result.success) {
         return res.status(400).json(result);
       }
-      
+
       return res.json(result);
     } catch (error: any) {
       next(error);
@@ -135,16 +136,16 @@ export const authController = {
   async forgotPassword(req: Request, res: Response, next: NextFunction): Promise<Response | void> {
     try {
       const { email } = req.body;
-      
+
       if (!email || typeof email !== 'string') {
         return res.status(400).json({
           success: false,
           message: 'Geçerli bir e-posta adresi giriniz',
         });
       }
-      
+
       const result = await authService.forgotPassword(email);
-      
+
       return res.json(result);
     } catch (error: any) {
       next(error);
