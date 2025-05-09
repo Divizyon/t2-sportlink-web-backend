@@ -5,7 +5,7 @@ import multer from 'multer';
 
 // Multer ayarları - geçici olarak bellek depolaması kullanıyoruz
 const storage = multer.memoryStorage();
-const upload = multer({ 
+const upload = multer({
   storage,
   limits: {
     fileSize: 2 * 1024 * 1024, // 2MB limit
@@ -45,34 +45,22 @@ router.get('/:userId', authenticate, isUser, userController.getUserProfile);
  * Admin ve superadmin rolündeki kullanıcılar erişebilir
  */
 // Tüm kullanıcıları listeleme (sadece admin ve superadmin)
-router.get('/admin/users', authenticate, isAdmin, (req, res) => {
-  // Admin tüm kullanıcıları listeliyor
-  // Controller fonksiyonu burada çağrılacak
-  return res.json({
-    success: true,
-    message: 'Tüm kullanıcıları listeleme endpointi (Admin erişimi)'
-  });
-});
+router.get('/admin/users', authenticate, isAdmin, userController.getAllUsers);
 
 // Belirli bir kullanıcıyı görüntüleme (sadece admin ve superadmin)
-router.get('/admin/users/:userId', authenticate, isAdmin, (req, res) => {
-  // Admin belirli bir kullanıcıyı görüntülüyor
-  // Controller fonksiyonu burada çağrılacak
-  return res.json({
-    success: true,
-    message: `${req.params.userId} ID'li kullanıcıyı görüntüleme endpointi (Admin erişimi)`
-  });
-});
+router.get('/admin/users/:userId', authenticate, isAdmin, userController.getUserById);
 
 // Bir kullanıcının rolünü değiştirme (sadece admin ve superadmin)
-router.put('/admin/users/:userId/role', authenticate, isAdmin, (req, res) => {
-  // Admin bir kullanıcının rolünü değiştiriyor
-  // Controller fonksiyonu burada çağrılacak
-  return res.json({
-    success: true,
-    message: `${req.params.userId} ID'li kullanıcının rolünü değiştirme endpointi (Admin erişimi)`
-  });
-});
+router.put('/admin/users/:userId/role', authenticate, isAdmin, userController.changeUserRole);
+
+// Kullanıcı silme (sadece admin ve superadmin)
+router.delete('/admin/users/:userId', authenticate, isAdmin, userController.deleteUser);
+
+// Kullanıcının oluşturduğu etkinlikleri listeleme (sadece admin ve superadmin)
+router.get('/admin/users/:userId/created-events', authenticate, isAdmin, userController.getUserCreatedEvents);
+
+// Kullanıcının katıldığı etkinlikleri listeleme (sadece admin ve superadmin)
+router.get('/admin/users/:userId/participated-events', authenticate, isAdmin, userController.getUserParticipatedEvents);
 
 /**
  * SuperAdmin özel işlemleri
