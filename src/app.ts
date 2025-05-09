@@ -13,6 +13,7 @@ import reportRoutes from './routes/reportRoutes';
 import newsRoutes from './routes/newsRoutes';
 import adminRoutes from './routes/adminRoutes';
 import announcementRoutes from './routes/announcementRoutes';
+import superAdminRoutes from './routes/superAdminRoutes';
 
 // Çevre değişkenlerini yükle
 dotenv.config();
@@ -55,6 +56,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/announcements', announcementRoutes);
+app.use('/api/superadmin', superAdminRoutes);
 
 // 404 handler
 app.use((_: Request, res: Response) => {
