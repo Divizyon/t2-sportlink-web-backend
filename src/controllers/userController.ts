@@ -19,6 +19,13 @@ const sportsUpdateSchema = z.array(
   })
 );
 
+// Rol değiştirme için validasyon şeması
+const roleUpdateSchema = z.object({
+  role: z.enum(['user', 'admin', 'superadmin'], {
+    errorMap: () => ({ message: 'Rol "user", "admin" veya "superadmin" olmalıdır' })
+  })
+});
+
 export const userController = {
   /**
    * Kullanıcı profil bilgilerini getir
@@ -27,12 +34,12 @@ export const userController = {
     try {
       const userId = req.user!.id;
       const result = await userService.getProfile(userId);
-      
+
       if (!result.success) {
         res.status(404).json(result);
         return;
       }
-      
+
       res.json(result);
     } catch (error) {
       next(error);
@@ -45,10 +52,10 @@ export const userController = {
   async updateProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.id;
-      
+
       // Veri doğrulama
       const validationResult = profileUpdateSchema.safeParse(req.body);
-      
+
       if (!validationResult.success) {
         res.status(400).json({
           success: false,
@@ -58,15 +65,15 @@ export const userController = {
         });
         return;
       }
-      
+
       const result = await userService.updateProfile(userId, validationResult.data);
-      
+
       if (!result.success) {
         const status = result.code === 'USER_NOT_FOUND' ? 404 : 400;
         res.status(status).json(result);
         return;
       }
-      
+
       res.json(result);
     } catch (error) {
       next(error);
@@ -79,7 +86,7 @@ export const userController = {
   async updateProfilePicture(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.id;
-      
+
       if (!req.file) {
         res.status(400).json({
           success: false,
@@ -88,14 +95,14 @@ export const userController = {
         });
         return;
       }
-      
+
       const result = await userService.updateProfilePicture(userId, req.file);
-      
+
       if (!result.success) {
         res.status(400).json(result);
         return;
       }
-      
+
       res.json(result);
     } catch (error) {
       next(error);
@@ -108,10 +115,10 @@ export const userController = {
   async updateSports(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.id;
-      
+
       // Veri doğrulama
       const validationResult = sportsUpdateSchema.safeParse(req.body);
-      
+
       if (!validationResult.success) {
         res.status(400).json({
           success: false,
@@ -121,14 +128,14 @@ export const userController = {
         });
         return;
       }
-      
+
       const result = await userService.updateSports(userId, validationResult.data);
-      
+
       if (!result.success) {
         res.status(400).json(result);
         return;
       }
-      
+
       res.json(result);
     } catch (error) {
       next(error);
@@ -141,14 +148,165 @@ export const userController = {
   async getUserProfile(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { userId } = req.params;
-      
+
       const result = await userService.getUserProfile(userId);
-      
+
       if (!result.success) {
         res.status(404).json(result);
         return;
       }
-      
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Admin: Tüm kullanıcıları listele
+   */
+  async getAllUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const filter = req.query.q as string | undefined;
+
+      const result = await userService.getAllUsers(page, limit, filter);
+
+      if (!result.success) {
+        res.status(400).json(result);
+        return;
+      }
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Admin: ID'ye göre kullanıcı detaylarını getir
+   */
+  async getUserById(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId } = req.params;
+
+      const result = await userService.getUserById(userId);
+
+      if (!result.success) {
+        res.status(404).json(result);
+        return;
+      }
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Admin: Kullanıcı rolünü değiştir
+   */
+  async changeUserRole(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const adminId = req.user!.id;
+
+      // Veri doğrulama
+      const validationResult = roleUpdateSchema.safeParse(req.body);
+
+      if (!validationResult.success) {
+        res.status(400).json({
+          success: false,
+          message: 'Doğrulama hatası',
+          errors: validationResult.error.errors,
+          code: 'VALIDATION_ERROR'
+        });
+        return;
+      }
+
+      const result = await userService.changeUserRole(userId, validationResult.data.role, adminId);
+
+      if (!result.success) {
+        const status =
+          result.code === 'USER_NOT_FOUND' ? 404 :
+            result.code === 'INSUFFICIENT_PERMISSION' ? 403 : 400;
+
+        res.status(status).json(result);
+        return;
+      }
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Admin: Kullanıcıyı sil
+   */
+  async deleteUser(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const adminId = req.user!.id;
+
+      const result = await userService.deleteUser(userId, adminId);
+
+      if (!result.success) {
+        const status =
+          result.code === 'USER_NOT_FOUND' ? 404 :
+            result.code === 'INSUFFICIENT_PERMISSION' ? 403 : 400;
+
+        res.status(status).json(result);
+        return;
+      }
+
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Admin: Kullanıcının oluşturduğu etkinlikleri listele
+   */
+  async getUserCreatedEvents(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+
+      const result = await userService.getUserCreatedEvents(userId, page, limit);
+
+      if (!result.success) {
+        const status = result.code === 'USER_NOT_FOUND' ? 404 : 400;
+        res.status(status).json(result);
+        return;
+      }
+
+      res.json(result);
+    } catch (error) {
+      next(error);
+    }
+  },
+
+  /**
+   * Admin: Kullanıcının katıldığı etkinlikleri listele
+   */
+  async getUserParticipatedEvents(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { userId } = req.params;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+
+      const result = await userService.getUserParticipatedEvents(userId, page, limit);
+
+      if (!result.success) {
+        const status = result.code === 'USER_NOT_FOUND' ? 404 : 400;
+        res.status(status).json(result);
+        return;
+      }
+
       res.json(result);
     } catch (error) {
       next(error);
