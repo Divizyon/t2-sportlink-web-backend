@@ -2,6 +2,7 @@ import { supabase } from '../config/supabase';
 import prisma from '../config/prisma';
 import dotenv from 'dotenv';
 import { Prisma } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 dotenv.config();
 
@@ -50,6 +51,26 @@ export const authService = {
         };
       }
 
+      // Supabase'de bu email ile daha önce kayıt olmuş kullanıcıyı temizle
+      try {
+        const { data, error } = await supabase.auth.admin.listUsers();
+        if (!error && data && data.users) {
+          const supabaseUser = data.users.find(user => user.email === userData.email);
+          if (supabaseUser) {
+            // Kullanıcı Supabase'de var ama Prisma'da yok, demek ki silinmiş. Supabase'den de silelim
+            const { error: deleteError } = await supabase.auth.admin.deleteUser(supabaseUser.id);
+            if (deleteError) {
+              console.error(`Supabase'den eski kullanıcı silinirken hata: ${deleteError.message}`);
+            } else {
+              console.log(`Supabase'den eski kullanıcı kaydı temizlendi: ${userData.email}`);
+            }
+          }
+        }
+      } catch (supabaseError) {
+        console.error('Supabase kontrol işlemi sırasında hata:', supabaseError);
+        // Hata olsa da kayıt işlemine devam et
+      }
+
       // Supabase'de kullanıcı kaydı oluştur ve e-posta doğrulama gönder
       const { error: authError } = await supabase.auth.signUp({
         email: userData.email,
@@ -83,13 +104,16 @@ export const authService = {
         throw new Error(`Supabase kaydında hata: ${authError.message}`);
       }
 
+      // Şifreyi hashle
+      const hashedPassword = await bcrypt.hash(userData.password, 10);
+
       // Prisma ile veritabanında kullanıcı oluştur
       // Supabase'de kullanıcı kimliği ile ilişkilendir
       const user = await prisma.user.create({
         data: {
           username: userData.username,
           email: userData.email,
-          password: '', // Şifreyi Supabase yönettiği için boş bırakıyoruz
+          password: hashedPassword, // Artık hashedPassword kullanıyoruz
           first_name: userData.first_name,
           last_name: userData.last_name,
           phone: userData.phone || null,
@@ -111,7 +135,7 @@ export const authService = {
     } catch (error: any) {
       // Hata durumunda oluşturulan kullanıcıyı temizle
       await this.cleanupAfterFailedRegistration(userData.email);
-      
+
       // Prisma hatalarını kullanıcı dostu mesajlara dönüştür
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         // P2002 kodu, unique constraint ihlali hatası
@@ -138,7 +162,7 @@ export const authService = {
           };
         }
       }
-      
+
       return {
         success: false,
         message: 'Kayıt işlemi sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyiniz.',
@@ -187,6 +211,16 @@ export const authService = {
       // Kullanıcıyı Prisma'dan al
       const user = await prisma.user.findUnique({
         where: { email: loginData.email },
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          password: true,
+          first_name: true,
+          last_name: true,
+          role: true,
+          email_verified: true
+        }
       });
 
       if (!user) {
@@ -197,7 +231,39 @@ export const authService = {
         };
       }
 
+      // Kullanıcının rolünü kontrol et - sadece admin ve superadmin giriş yapabilir
+      if (user.role !== 'admin' && user.role !== 'superadmin') {
+        return {
+          success: false,
+          message: 'Yetki hatasıː Bu sisteme sadece yöneticiler giriş yapabilir.',
+          code: 'INSUFFICIENT_PERMISSIONS'
+        };
+      }
+
+      // Eğer kullanıcının hash'lenmiş parolası varsa ve doğru formatta ise, yerel doğrulama yapalım
+      if (user.password && user.password.startsWith('$2')) {
+        try {
+          // Parolayı doğrula
+          const isValidPassword = await bcrypt.compare(loginData.password, user.password);
+          if (!isValidPassword) {
+            // Parola uyuşmazlığı log'unu ekleyebiliriz (isteğe bağlı)
+            console.warn(`Yerel parola doğrulaması başarısız: ${user.email}`);
+          }
+        } catch (e) {
+          // Parola doğrulama hatası
+          console.error('Parola doğrulama hatası:', e);
+        }
+      }
+
       // Başarılı giriş - kullanıcı bilgilerini ve oturum token'ını döndür
+      // E-posta zaten Supabase tarafından doğrulandığından, veritabanındaki email_verified alanını da güncelle
+      if (!user.email_verified) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { email_verified: true }
+        });
+      }
+
       return {
         success: true,
         message: 'Giriş başarılı',
@@ -207,6 +273,7 @@ export const authService = {
           email: user.email,
           first_name: user.first_name,
           last_name: user.last_name,
+          role: user.role
         },
         session: data.session,
       };
@@ -227,7 +294,7 @@ export const authService = {
   async handleEmailVerification(token: string) {
     try {
       // Supabase'den token'ı doğrula
-      const {  error } = await supabase.auth.verifyOtp({
+      const { error } = await supabase.auth.verifyOtp({
         token_hash: token,
         type: 'email',
       });
@@ -242,7 +309,7 @@ export const authService = {
 
       // Kullanıcı bilgilerini al
       const { data: userData } = await supabase.auth.getUser();
-      
+
       if (!userData || !userData.user) {
         return {
           success: false,
@@ -283,8 +350,26 @@ export const authService = {
         where: { email },
       });
 
-      // Supabase'den kullanıcıyı silmek için ek işlemler gerekebilir
-      // Bu kısım gerekirse Supabase admin API'si ile yapılabilir
+      try {
+        // Supabase'den kullanıcıyı bulma ve silme
+        const { data, error } = await supabase.auth.admin.listUsers();
+        if (error) {
+          console.error(`Supabase kullanıcıları listelenirken hata: ${error.message}`);
+        } else if (data && data.users) {
+          const supabaseUser = data.users.find(user => user.email === email);
+          if (supabaseUser) {
+            // Kullanıcıyı Supabase'den sil
+            const { error: deleteError } = await supabase.auth.admin.deleteUser(supabaseUser.id);
+            if (deleteError) {
+              console.error(`Supabase'den kullanıcı silinirken hata: ${deleteError.message}`);
+            } else {
+              console.log(`Supabase'den kullanıcı başarıyla silindi: ${email}`);
+            }
+          }
+        }
+      } catch (supabaseError) {
+        console.error('Supabase temizlik işlemi sırasında hata:', supabaseError);
+      }
     } catch (error) {
       // Silme işlemi başarısız olursa sessizce devam et
       console.error('Temizlik işlemi sırasında hata:', error);
@@ -297,11 +382,11 @@ export const authService = {
   async logout() {
     try {
       const { error } = await supabase.auth.signOut();
-      
+
       if (error) {
         return {
           success: false,
-          message: `Çıkış başarısız: ${error.message}`,
+          message: `Çıkış sırasında hata: ${error.message}`,
           code: 'LOGOUT_ERROR'
         };
       }
@@ -313,7 +398,7 @@ export const authService = {
     } catch (error: any) {
       return {
         success: false,
-        message: 'Çıkış işlemi sırasında bir hata oluştu.',
+        message: 'Çıkış işlemi sırasında bir hata oluştu',
         details: process.env.NODE_ENV === 'development' ? error.message : undefined,
         code: 'LOGOUT_ERROR'
       };
@@ -321,35 +406,50 @@ export const authService = {
   },
 
   /**
-   * Şifre sıfırlama bağlantısı gönderir
+   * Şifre sıfırlama isteği gönderir
    */
   async forgotPassword(email: string) {
     try {
-      // Supabase şifre sıfırlama e-postası gönder
+      // Önce kullanıcının var olup olmadığını kontrol et
+      const user = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true, email: true }
+      });
+
+      if (!user) {
+        // Güvenlik nedeniyle, kullanıcı bulunamasa bile başarılı mesajı döndür
+        return {
+          success: true,
+          message: 'Şifre sıfırlama talimatları e-posta adresinize gönderildi. Lütfen e-postanızı kontrol edin.',
+        };
+      }
+
+      // Supabase üzerinden şifre sıfırlama e-postası gönder
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${process.env.FRONTEND_URL}/auth/reset-password`,
       });
 
       if (error) {
+        console.error(`Şifre sıfırlama hatası: ${error.message}`);
         return {
           success: false,
-          message: 'Şifre sıfırlama işlemi sırasında bir hata oluştu.',
-          details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+          message: 'Şifre sıfırlama e-postası gönderilirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.',
           code: 'PASSWORD_RESET_ERROR'
         };
       }
 
       return {
         success: true,
-        message: 'Şifre sıfırlama talimatları e-posta adresinize gönderildi.',
+        message: 'Şifre sıfırlama talimatları e-posta adresinize gönderildi. Lütfen e-postanızı kontrol edin.',
       };
     } catch (error: any) {
+      console.error('Şifre sıfırlama işlemi sırasında hata:', error);
       return {
         success: false,
-        message: 'Şifre sıfırlama işlemi sırasında bir hata oluştu.',
+        message: 'Şifre sıfırlama işlemi sırasında bir hata oluştu. Lütfen daha sonra tekrar deneyin.',
         details: process.env.NODE_ENV === 'development' ? error.message : undefined,
         code: 'PASSWORD_RESET_ERROR'
       };
     }
-  },
-}; 
+  }
+};

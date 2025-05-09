@@ -289,12 +289,14 @@ export const userService = {
   /**
    * Tüm kullanıcıları listeler (Admin ve SuperAdmin için)
    */
-  async getAllUsers(page: number = 1, limit: number = 10, filter?: string) {
+  async getAllUsers(page: number = 1, limit: number = 10, filter?: string, role?: string, isActive?: boolean) {
     try {
       const skip = (page - 1) * limit;
 
       // Filtreleme koşulu oluştur
-      let where = {};
+      let where: any = {};
+
+      // Arama filtresi
       if (filter) {
         where = {
           OR: [
@@ -305,6 +307,24 @@ export const userService = {
           ],
         };
       }
+
+      // Rol filtresi
+      if (role) {
+        where = {
+          ...where,
+          role: role
+        };
+      }
+
+      // Aktif kullanıcı filtresi (Şu an DB'de isActive/active alanı olmadığı varsayımıyla, 
+      // eğer varsa isActive filtresi eklenebilir)
+      // Bu kısmı DB yapısına göre güncellemeniz gerekebilir
+      // if (isActive !== undefined) {
+      //   where = {
+      //     ...where,
+      //     active: isActive 
+      //   };
+      // }
 
       // Toplam kayıt sayısını al
       const totalUsers = await prisma.user.count({ where });
@@ -544,6 +564,29 @@ export const userService = {
           message: 'Kendi hesabınızı bu yöntemle silemezsiniz',
           code: 'SELF_DELETE_NOT_ALLOWED'
         };
+      }
+
+      try {
+        // Supabase'den kullanıcıyı bulma ve silme
+        // Önce kullanıcıları listeleyelim ve e-posta ile eşleşen kullanıcıyı bulalım
+        const { data, error } = await supabase.auth.admin.listUsers();
+        if (error) {
+          console.error(`Supabase kullanıcıları listelenirken hata: ${error.message}`);
+        } else if (data && data.users) {
+          const supabaseUser = data.users.find(user => user.email === targetUser.email);
+          if (supabaseUser) {
+            // Kullanıcıyı Supabase'den sil
+            const { error: deleteError } = await supabase.auth.admin.deleteUser(supabaseUser.id);
+            if (deleteError) {
+              console.error(`Supabase'den kullanıcı silinirken hata: ${deleteError.message}`);
+            } else {
+              console.log(`Supabase'den kullanıcı başarıyla silindi: ${targetUser.email}`);
+            }
+          }
+        }
+      } catch (supabaseError) {
+        console.error('Supabase işlemi sırasında hata:', supabaseError);
+        // Supabase hatası olsa bile işleme devam et, en azından veritabanından silmeyi deneyelim
       }
 
       // Kullanıcıyı sil

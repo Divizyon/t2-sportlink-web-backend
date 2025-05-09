@@ -9,12 +9,12 @@ datasource db {
 }
 
 model user {
-  id                           String               @id @default(uuid())
-  username                     String               @unique
+  id                           String                     @id @default(uuid())
+  username                     String                     @unique
   password                     String
-  email                        String               @unique
-  email_verified               Boolean              @default(false)
-  verification_token           String?              @unique
+  email                        String                     @unique
+  email_verified               Boolean                    @default(false)
+  verification_token           String?                    @unique
   verification_token_expires   DateTime?
   first_name                   String
   last_name                    String
@@ -22,23 +22,27 @@ model user {
   profile_picture              String?
   default_location_latitude    Float?
   default_location_longitude   Float?
-  role                         String               @default("user")
-  created_at                   DateTime             @default(now())
-  updated_at                   DateTime             @updatedAt
+  role                         String                     @default("user")
+  created_at                   DateTime                   @default(now())
+  updated_at                   DateTime                   @updatedAt
+  DeviceToken                  DeviceToken[]
   admin_logs                   admin_log[]
   announcements                announcement[]
-  created_events               event[]              @relation("UserEvents")
+  conversation_participant     conversation_participant[]
+  created_events               event[]                    @relation("UserEvents")
   event_participants           event_participant[]
   event_ratings                event_rating[]
-  friends_initiator            friend[]             @relation("FriendInitiator")
-  friends_acceptor             friend[]             @relation("FriendAcceptor")
-  friendship_requests_received friendship_request[] @relation("RequestReceiver")
-  friendship_requests_sent     friendship_request[] @relation("RequestSender")
+  friends_initiator            friend[]                   @relation("FriendInitiator")
+  friends_acceptor             friend[]                   @relation("FriendAcceptor")
+  friendship_requests_received friendship_request[]       @relation("RequestReceiver")
+  friendship_requests_sent     friendship_request[]       @relation("RequestSender")
+  message                      message[]
+  message_read                 message_read[]
   notifications                notification[]
-  reports_received             report[]             @relation("Reported")
-  reports_made                 report[]             @relation("Reporter")
-  user_ratings_received        user_rating[]        @relation("RatedUser")
-  user_ratings_given           user_rating[]        @relation("RatingUser")
+  reports_received             report[]                   @relation("Reported")
+  reports_made                 report[]                   @relation("Reporter")
+  user_ratings_received        user_rating[]              @relation("RatedUser")
+  user_ratings_given           user_rating[]              @relation("RatingUser")
   user_sports                  user_sport[]
 }
 
@@ -115,6 +119,8 @@ model event {
   status             String
   created_at         DateTime            @default(now())
   updated_at         DateTime            @updatedAt
+  invitation_code    String?
+  is_private         Boolean             @default(false)
   creator            user                @relation("UserEvents", fields: [creator_id], references: [id], onDelete: Cascade)
   sport              sport               @relation(fields: [sport_id], references: [id], onDelete: Cascade)
   participants       event_participant[]
@@ -146,15 +152,23 @@ model event_rating {
 }
 
 model notification {
-  id                String   @id @default(uuid())
-  user_id           String
-  notification_type String
-  content           String
-  read_status       Boolean  @default(false)
-  created_at        DateTime @default(now())
-  event_id          String
-  event             event    @relation(fields: [event_id], references: [id], onDelete: Cascade)
-  user              user     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  id           String    @id @default(uuid())
+  user_id      String
+  created_at   DateTime  @default(now())
+  event_id     String?
+  type         String
+  title        String
+  body         String
+  is_read      Boolean   @default(false)
+  data         Json?
+  redirect_url String?
+  expires_at   DateTime?
+  event        event?    @relation(fields: [event_id], references: [id])
+  user         user      @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([event_id])
+  @@index([type])
+  @@index([user_id])
 }
 
 model report {
@@ -203,4 +217,82 @@ model announcement {
   created_at DateTime  @default(now())
   updated_at DateTime  @updatedAt
   creator    user?     @relation(fields: [creator_id], references: [id])
+}
+
+model DeviceToken {
+  id         String   @id
+  token      String   @unique
+  platform   String
+  user_id    String
+  created_at DateTime @default(now())
+  updated_at DateTime
+  user       user     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id])
+}
+
+model conversation {
+  id                       String                     @id
+  name                     String?
+  is_group                 Boolean                    @default(false)
+  created_at               DateTime                   @default(now())
+  updated_at               DateTime
+  conversation_participant conversation_participant[]
+  message                  message[]
+}
+
+model conversation_participant {
+  conversation_id String
+  user_id         String
+  joined_at       DateTime     @default(now())
+  left_at         DateTime?
+  is_admin        Boolean      @default(false)
+  conversation    conversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  user            user         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([conversation_id, user_id])
+}
+
+model message {
+  id              String         @id
+  conversation_id String
+  sender_id       String
+  content         String
+  media_url       String?
+  is_read         Boolean        @default(false)
+  created_at      DateTime       @default(now())
+  updated_at      DateTime
+  conversation    conversation   @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  user            user           @relation(fields: [sender_id], references: [id], onDelete: Cascade)
+  message_read    message_read[]
+}
+
+model message_read {
+  message_id String
+  user_id    String
+  read_at    DateTime @default(now())
+  message    message  @relation(fields: [message_id], references: [id], onDelete: Cascade)
+  user       user     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([message_id, user_id])
+}
+
+model realtime_messages {
+  id              String    @id @db.Uuid
+  conversation_id String    @db.Uuid
+  sender_id       String    @db.Uuid
+  content         String
+  media_url       String?
+  created_at      DateTime? @default(now()) @db.Timestamptz(6)
+}
+
+model realtime_notifications {
+  id              String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  user_id         String
+  notification_id String
+  title           String
+  body            String
+  data            Json?
+  type            String
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
 }

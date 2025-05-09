@@ -14,6 +14,7 @@ import newsRoutes from './routes/newsRoutes';
 import adminRoutes from './routes/adminRoutes';
 import announcementRoutes from './routes/announcementRoutes';
 import superAdminRoutes from './routes/superAdminRoutes';
+import { authenticate, isAdmin } from './middlewares/authMiddleware';
 
 // Çevre değişkenlerini yükle
 dotenv.config();
@@ -47,16 +48,22 @@ app.get('/', (_: Request, res: Response) => {
   });
 });
 
-// API rotalarını bağla
+// Auth rotaları - herkes erişebilir
 app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/events', eventRoutes);
-app.use('/api/friends', friendRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/news', newsRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/announcements', announcementRoutes);
-app.use('/api/superadmin', superAdminRoutes);
+
+// Bundan sonraki tüm API rotaları sadece admin ve superadmin erişimi için
+// Admin kontrolü middleware - tüm API rotalarını koruyoruz
+const adminRouteProtection = [authenticate, isAdmin];
+
+// Korumalı API rotalarını bağla
+app.use('/api/users', adminRouteProtection, userRoutes);
+app.use('/api/events', adminRouteProtection, eventRoutes);
+app.use('/api/friends', adminRouteProtection, friendRoutes);
+app.use('/api/reports', adminRouteProtection, reportRoutes);
+app.use('/api/news', adminRouteProtection, newsRoutes);
+app.use('/api/admin', adminRouteProtection, adminRoutes);
+app.use('/api/announcements', adminRouteProtection, announcementRoutes);
+app.use('/api/superadmin', adminRouteProtection, superAdminRoutes);
 
 // 404 handler
 app.use((_: Request, res: Response) => {
