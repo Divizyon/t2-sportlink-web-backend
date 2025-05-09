@@ -170,8 +170,11 @@ export const userController = {
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 10;
       const filter = req.query.q as string | undefined;
+      const role = req.query.role as string | undefined;
+      const isActive = req.query.isActive !== undefined ?
+        (req.query.isActive === 'true') : undefined;
 
-      const result = await userService.getAllUsers(page, limit, filter);
+      const result = await userService.getAllUsers(page, limit, filter, role, isActive);
 
       if (!result.success) {
         res.status(400).json(result);
