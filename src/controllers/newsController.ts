@@ -13,15 +13,15 @@ export const getAllNews = async (req: Request, res: Response) => {
     const sportId = req.query.sportId as string;
 
     const skip = (page - 1) * limit;
-    
+
     // Sport ID'ye göre filtrelenecekse sorguya ekle
     const whereCondition = sportId ? { sport_id: sportId } : {};
-    
+
     // Toplam kayıt sayısını hesapla
     const totalCount = await prisma.news.count({
       where: whereCondition
     });
-    
+
     // Haberleri getir
     const news = await prisma.news.findMany({
       skip,
@@ -34,12 +34,12 @@ export const getAllNews = async (req: Request, res: Response) => {
         sport: true
       }
     });
-    
+
     // Meta bilgileri oluştur
     const totalPages = Math.ceil(totalCount / limit);
     const hasNextPage = page < totalPages;
     const hasPrevPage = page > 1;
-    
+
     return res.status(200).json({
       status: true,
       data: news,
@@ -99,7 +99,7 @@ export const searchNews = async (req: Request, res: Response) => {
     const keyword = req.query.keyword as string;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
-    
+
     if (!keyword) {
       return res.status(400).json({
         success: false,
@@ -153,7 +153,7 @@ export const getNewsBySport = async (req: Request, res: Response) => {
     const { sportId } = req.params;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
-    
+
     // Spor dalının varlığını kontrol et
     const sport = await prisma.sport.findUnique({
       where: { id: sportId }
@@ -176,7 +176,7 @@ export const getNewsBySport = async (req: Request, res: Response) => {
     const total = await prisma.news.count({
       where: { sport_id: sportId }
     });
-    
+
     return res.status(200).json({
       success: true,
       data: {
@@ -206,9 +206,9 @@ export const getNewsBySport = async (req: Request, res: Response) => {
 export const getLatestNews = async (req: Request, res: Response) => {
   try {
     const limit = parseInt(req.query.limit as string) || 5;
-    
+
     const news = await News.findLatest(limit);
-    
+
     return res.status(200).json({
       success: true,
       data: { news }
@@ -218,6 +218,63 @@ export const getLatestNews = async (req: Request, res: Response) => {
     return res.status(500).json({
       success: false,
       message: 'En son haberler getirilirken bir hata oluştu',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Haberi siler
+ */
+export const deleteNews = async (req: Request, res: Response) => {
+  try {
+    const { newsId } = req.params;
+    const userId = req.user.id;
+
+    // Haberin var olup olmadığını kontrol et
+    const existingNews = await News.findUnique({ id: newsId });
+
+    if (!existingNews) {
+      return res.status(404).json({
+        success: false,
+        message: 'Haber bulunamadı'
+      });
+    }
+
+    // Kullanıcının yetki kontrolü (örnek olarak admin kontrolü)
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true }
+    });
+
+    if (!user || (user.role !== 'admin' && user.role !== 'superadmin')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Bu işlemi yapmak için yetkiniz bulunmamaktadır'
+      });
+    }
+
+    // Haberi sil
+    await News.delete({ id: newsId });
+
+    // İşlem kaydı
+    await prisma.admin_log.create({
+      data: {
+        admin_id: userId,
+        action_type: 'delete_news',
+        description: `"${existingNews.title}" başlıklı haber silindi`
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Haber başarıyla silindi'
+    });
+  } catch (error: any) {
+    console.error('Haber silme hatası:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Haber silinirken bir hata oluştu',
       error: error.message
     });
   }

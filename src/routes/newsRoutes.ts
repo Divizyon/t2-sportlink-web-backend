@@ -39,4 +39,11 @@ router.get('/sports/:sportId', newsController.getNewsBySport);
  */
 router.get('/:newsId', newsController.getNewsById);
 
+/**
+ * @route   DELETE /api/news/:newsId
+ * @desc    Haberi siler
+ * @access  Private (Admin, SuperAdmin)
+ */
+router.delete('/:newsId', authenticate, newsController.deleteNews);
+
 export default router; 

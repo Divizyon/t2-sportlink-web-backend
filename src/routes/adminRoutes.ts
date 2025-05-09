@@ -46,6 +46,9 @@ router.delete('/news/:newsId', AdminNewsController.deleteNews);
 // Spor dallarını listele (haber oluşturma/düzenleme için)
 router.get('/sports', AdminNewsController.getSports);
 
+// Manuel haber çekme işlemini başlat
+router.post('/news/scrape', AdminController.runNewsScraper);
+
 // DUYURU YÖNETİMİ
 
 // Tüm duyuruları listele (yönetim paneli için)

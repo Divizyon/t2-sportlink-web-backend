@@ -26,7 +26,7 @@ export const sendFriendRequest = async (req: Request, res: Response) => {
 
     try {
       const request = await Friend.sendRequest(senderId, userId);
-      
+
       return res.status(201).json({
         success: true,
         message: 'Arkadaşlık isteği başarıyla gönderildi',
@@ -66,7 +66,7 @@ export const acceptFriendRequest = async (req: Request, res: Response) => {
 
     try {
       const result = await Friend.acceptRequest(requestId, userId);
-      
+
       return res.status(200).json({
         success: true,
         message: 'Arkadaşlık isteği kabul edildi',
@@ -106,7 +106,7 @@ export const rejectFriendRequest = async (req: Request, res: Response) => {
 
     try {
       const rejectedRequest = await Friend.rejectRequest(requestId, userId);
-      
+
       return res.status(200).json({
         success: true,
         message: 'Arkadaşlık isteği reddedildi',
@@ -146,7 +146,7 @@ export const removeFriend = async (req: Request, res: Response) => {
 
     try {
       await Friend.removeFriend(currentUserId, userId);
-      
+
       return res.status(200).json({
         success: true,
         message: 'Arkadaşlık başarıyla sonlandırıldı'
@@ -181,7 +181,7 @@ export const getFriendRequests = async (req: Request, res: Response) => {
 
     // Tüm istekleri getir
     const requests = await Friend.getRequests(userId, status);
-    
+
     // Sayfalama için istekleri böl
     const paginatedRequests = requests.slice(skip, skip + limit);
     const totalRequests = requests.length;
@@ -221,7 +221,7 @@ export const getFriends = async (req: Request, res: Response) => {
 
     // Tüm arkadaşları getir
     const friends = await Friend.getFriends(userId);
-    
+
     // Sayfalama için arkadaşları böl
     const paginatedFriends = friends.slice(skip, skip + limit);
     const totalFriends = friends.length;
@@ -269,7 +269,7 @@ export const checkFriendshipStatus = async (req: Request, res: Response) => {
     const pendingRequest = await Friend.checkPendingRequest(currentUserId, userId);
 
     let status = 'none'; // Hiçbir ilişki yok
-    let requestInfo = null;
+    let requestInfo: any = null;
 
     if (isFriend) {
       status = 'friend'; // Arkadaşlar

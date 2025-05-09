@@ -2,6 +2,9 @@ import { Request, Response, NextFunction } from 'express';
 import { Event } from '../models/Event';
 import prisma from '../config/prisma';
 import { z } from 'zod';
+import { scrapeNews } from '../scripts/newsScraper';
+import { scrapeSporx } from '../scripts/sporxScraper';
+import { scrapeKonyasporNews } from '../scripts/konyasporScraper';
 
 /**
  * Admin paneli için gerekli controller fonksiyonları
@@ -197,6 +200,75 @@ export class AdminController {
                     }
                 }
             });
+            return;
+        } catch (error: any) {
+            next(error);
+            return;
+        }
+    }
+
+    /**
+     * Manuel olarak haber çekme işlemini başlatır
+     */
+    static async runNewsScraper(req: Request, res: Response, next: NextFunction): Promise<void> {
+        try {
+            // Hangi scraperın çalıştırılacağını belirle
+            const { source } = req.query;
+            const userId = req.user.id;
+
+            // İşlem başladı bilgisi
+            res.status(200).json({
+                success: true,
+                message: 'Haber çekme işlemi başlatıldı. Bu işlem arka planda devam edecek.'
+            });
+
+            // Log kaydı
+            await prisma.admin_log.create({
+                data: {
+                    admin_id: userId,
+                    action_type: 'run_news_scraper',
+                    description: `Manuel haber çekme işlemi başlatıldı (${source || 'tümü'})`
+                }
+            });
+
+            // Asenkron olarak scraperleri çalıştır
+            setTimeout(async () => {
+                try {
+                    if (!source || source === 'all') {
+                        // Tüm scraperları çalıştır
+                        await scrapeNews();
+                    } else if (source === 'sporx') {
+                        // Sadece Sporx
+                        await scrapeSporx();
+                    } else if (source === 'konyaspor') {
+                        // Sadece Konyaspor
+                        await scrapeKonyasporNews();
+                    }
+
+                    console.log(`${source || 'Tüm'} haber kaynakları için scraping tamamlandı`);
+
+                    // Log kaydı ekle
+                    await prisma.admin_log.create({
+                        data: {
+                            admin_id: userId,
+                            action_type: 'scraper_completed',
+                            description: `Haber çekme işlemi tamamlandı (${source || 'tümü'})`
+                        }
+                    });
+                } catch (error) {
+                    console.error('Manuel haber çekme işleminde hata:', error);
+
+                    // Hata logu ekle
+                    await prisma.admin_log.create({
+                        data: {
+                            admin_id: userId,
+                            action_type: 'scraper_error',
+                            description: `Haber çekme işleminde hata: ${error}`
+                        }
+                    }).catch(e => console.error('Log kaydederken hata:', e));
+                }
+            }, 100); // 100ms bekletme ile başlat (0 yerine)
+
             return;
         } catch (error: any) {
             next(error);
