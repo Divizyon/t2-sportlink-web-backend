@@ -16,6 +16,14 @@ import announcementRoutes from './routes/announcementRoutes';
 import superAdminRoutes from './routes/superAdminRoutes';
 import { authenticate, isAdmin } from './middlewares/authMiddleware';
 
+// Haber çekme zamanlayıcısını import et
+if (process.env.NODE_ENV === 'production' || process.env.ENABLE_SCRAPER === 'true') {
+  console.log('Haber çekme zamanlayıcısı yükleniyor...');
+  import('./scripts/scheduledScraper')
+    .then(() => console.log('Haber çekme zamanlayıcısı başarıyla başlatıldı'))
+    .catch(err => console.error('Haber çekme zamanlayıcısı başlatılamadı:', err));
+}
+
 // Çevre değişkenlerini yükle
 dotenv.config();
 
