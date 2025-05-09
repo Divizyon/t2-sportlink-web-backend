@@ -64,7 +64,7 @@ export class Notification {
     return prisma.notification.findMany({
       where: {
         user_id: userId,
-        ...(includeRead ? {} : { read_status: false }),
+        ...(includeRead ? {} : { is_read: false }),
       },
       skip,
       take,
@@ -81,7 +81,7 @@ export class Notification {
   static async markAsRead(id: string) {
     return prisma.notification.update({
       where: { id },
-      data: { read_status: true },
+      data: { is_read: true },
     });
   }
 
@@ -92,10 +92,10 @@ export class Notification {
     return prisma.notification.updateMany({
       where: {
         user_id: userId,
-        read_status: false,
+        is_read: false,
       },
       data: {
-        read_status: true,
+        is_read: true,
       },
     });
   }
@@ -107,7 +107,7 @@ export class Notification {
     return prisma.notification.count({
       where: {
         user_id: userId,
-        read_status: false,
+        is_read: false,
       },
     });
   }
@@ -128,8 +128,9 @@ export class Notification {
     const notifications = participants.map((participant) => ({
       user_id: participant.user_id,
       event_id: eventId,
-      content,
-      notification_type: notificationType,
+      type: notificationType,
+      title: "Etkinlik Bildirimi",
+      body: content,
     }));
 
     return prisma.notification.createMany({
