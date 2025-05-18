@@ -14,6 +14,7 @@ import newsRoutes from './routes/newsRoutes';
 import adminRoutes from './routes/adminRoutes';
 import announcementRoutes from './routes/announcementRoutes';
 import superAdminRoutes from './routes/superAdminRoutes';
+import dashboardRoutes from './routes/dashboardRoutes';
 import { authenticate, isAdmin } from './middlewares/authMiddleware';
 
 // Haber çekme zamanlayıcısını import et
@@ -72,6 +73,7 @@ app.use('/api/news', adminRouteProtection, newsRoutes);
 app.use('/api/admin', adminRouteProtection, adminRoutes);
 app.use('/api/announcements', adminRouteProtection, announcementRoutes);
 app.use('/api/superadmin', adminRouteProtection, superAdminRoutes);
+app.use('/api/dashboard', adminRouteProtection, dashboardRoutes);
 
 // 404 handler
 app.use((_: Request, res: Response) => {
