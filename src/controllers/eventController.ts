@@ -47,7 +47,7 @@ const createEventSchema = z.object({
   location_latitude: z.number().min(-90).max(90),
   location_longitude: z.number().min(-180).max(180),
   max_participants: z.number().int().positive(),
-  status: z.enum(['active', 'canceled', 'completed', 'draft', 'pending']),
+  status: z.enum(['active', 'canceled', 'completed', 'pasif', 'pending']),
 });
 
 // Etkinlik güncelleme için schema
@@ -67,7 +67,7 @@ const updateEventSchema = z.object({
   location_latitude: z.number().min(-90).max(90).optional(),
   location_longitude: z.number().min(-180).max(180).optional(),
   max_participants: z.number().int().positive().optional(),
-  status: z.enum(['active', 'canceled', 'completed', 'draft', 'pending']).optional(),
+  status: z.enum(['active', 'canceled', 'completed', 'pasif', 'pending']).optional(),
 });
 
 // Etkinlik değerlendirme için schema
