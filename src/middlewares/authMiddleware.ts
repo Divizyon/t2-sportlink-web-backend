@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { supabase } from '../config/supabase';
 import prisma from '../config/prisma';
+import { UserRole } from '../types/enums';
 
 // Özel bir Request tipi tanımlayalım, kullanıcı bilgisini tutacak
 declare global {
@@ -78,10 +79,10 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
 
 /**
  * Kullanıcının belirli bir role sahip olup olmadığını kontrol eden middleware fabrikası
- * @param {string[]} roles - İzin verilen roller
+ * @param {UserRole[]} roles - İzin verilen roller
  * @returns Middleware fonksiyonu
  */
-export const authorize = (roles: string[]) => {
+export const authorize = (roles: UserRole[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
@@ -116,9 +117,9 @@ export const authorize = (roles: string[]) => {
 };
 
 // Hazır rol kontrol middleware'leri
-export const isUser = authorize(['user', 'admin', 'superadmin']);
-export const isAdmin = authorize(['admin', 'superadmin']);
-export const isSuperAdmin = authorize(['superadmin']);
+export const isUser = authorize([UserRole.USER, UserRole.ADMIN, UserRole.SUPERADMIN]);
+export const isAdmin = authorize([UserRole.ADMIN, UserRole.SUPERADMIN]);
+export const isSuperAdmin = authorize([UserRole.SUPERADMIN]);
 
 /**
  * Kullanıcının kendine ait kaynağa eriştiğini kontrol eden middleware
@@ -137,9 +138,9 @@ export const isResourceOwner = (paramName: string = 'userId') => {
       }
 
       const resourceId = req.params[paramName];
-      
+
       // Eğer kullanıcı admin veya superadmin ise, her kaynağa erişebilir
-      if (['admin', 'superadmin'].includes(req.user.role)) {
+      if ([UserRole.ADMIN, UserRole.SUPERADMIN].includes(req.user.role)) {
         return next();
       }
 

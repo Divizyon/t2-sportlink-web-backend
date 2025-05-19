@@ -16,6 +16,7 @@ import announcementRoutes from './routes/announcementRoutes';
 import superAdminRoutes from './routes/superAdminRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 import { authenticate, isAdmin } from './middlewares/authMiddleware';
+import timeoutMiddleware from './middlewares/timeoutMiddleware';
 
 // Haber çekme zamanlayıcısını import et
 if (process.env.NODE_ENV === 'production' || process.env.ENABLE_SCRAPER === 'true') {
@@ -33,20 +34,72 @@ const app = express();
 
 // Temel Middleware
 app.use(cors());
-app.use(helmet());
-app.use(compression());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(morgan('dev'));
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'", "https://api.example.com"]
+    }
+  },
+  xssFilter: true,
+  noSniff: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+}));
 
-// Rate limiting
-const limiter = rateLimit({
+// Sıkıştırma - büyük API yanıtları için önemli
+app.use(compression({
+  level: 6, // 0 (en hızlı, en az sıkıştırma) - 9 (en yavaş, en fazla sıkıştırma)
+  threshold: 1024, // sadece 1KB'dan büyük yanıtları sıkıştır
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    // text/*, application/json, application/javascript vb içerik türlerini sıkıştır
+    return compression.filter(req, res);
+  }
+}));
+
+// JSON ayrıştırma - büyük boyut limitli
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+
+// Logging
+app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
+
+// İstek zaman aşımı kontrolü - varsayılan olarak 29 saniye
+app.use(timeoutMiddleware(29000));
+
+// API Rate limiting - ana limiter
+const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 dakika
-  limit: 100, // IP başına istek limiti
+  limit: 300, // IP başına genel istek limiti
   standardHeaders: 'draft-7',
   legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Çok fazla istek gönderdiniz, lütfen daha sonra tekrar deneyin.',
+    code: 'RATE_LIMIT_EXCEEDED'
+  }
 });
-app.use(limiter);
+
+// Auth rotaları için daha sıkı rate limiting
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 dakika
+  limit: 40, // IP başına auth istek limiti
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Çok fazla oturum isteği gönderdiniz, lütfen daha sonra tekrar deneyin.',
+    code: 'AUTH_RATE_LIMIT_EXCEEDED'
+  }
+});
+
+// Ana API rate limiting
+app.use('/api/', apiLimiter);
 
 // Ana rota
 app.get('/', (_: Request, res: Response) => {
@@ -57,8 +110,8 @@ app.get('/', (_: Request, res: Response) => {
   });
 });
 
-// Auth rotaları - herkes erişebilir
-app.use('/api/auth', authRoutes);
+// Auth rotaları - herkes erişebilir ama daha sıkı rate limit ile
+app.use('/api/auth', authLimiter, authRoutes);
 
 // Bundan sonraki tüm API rotaları sadece admin ve superadmin erişimi için
 // Admin kontrolü middleware - tüm API rotalarını koruyoruz
